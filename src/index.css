@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* subtle scrollbars that suit both the dark sidebar and light panels */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.5) transparent;
+}
+
+/* faint blueprint grid so big empty areas don't feel flat */
+.blueprint-bg {
+  background-color: #eef2f7;
+  background-image: linear-gradient(rgb(99 102 241 / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(99 102 241 / 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* 🐱 easter egg: raining cats */
+@keyframes catfall {
+  0% {
+    transform: translateY(-12vh) rotate(0deg);
+  }
+  100% {
+    transform: translateY(112vh) rotate(360deg);
+  }
+}
+.cat-fall {
+  position: fixed;
+  top: 0;
+  animation: catfall linear forwards;
+  user-select: none;
+  pointer-events: none;
+}
