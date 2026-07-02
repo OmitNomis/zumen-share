@@ -4,6 +4,7 @@ import Viewer from "./Viewer";
 import Sidebar, { type OyaNode } from "./Sidebar";
 import Thumb from "./Thumb";
 import CatEasterEgg from "./CatEasterEgg";
+import { Button, Field, IconButton, Modal, SelectField, Spinner, Stamp, microCls } from "./ui";
 import * as Icon from "./icons";
 
 export default function App() {
@@ -51,9 +52,11 @@ export default function App() {
   if (!user) return <Login />;
 
   return (
-    <div className="h-screen flex overflow-hidden bg-slate-100 text-slate-800">
+    <div className="flex h-screen overflow-hidden bg-paper-100 text-ink-800">
       <CatEasterEgg />
-      {navOpen && <div className="fixed inset-0 bg-slate-900/50 z-30 lg:hidden" onClick={() => setNavOpen(false)} />}
+      {navOpen && (
+        <div className="animate-fade fixed inset-0 z-30 bg-ink-950/60 backdrop-blur-[2px] lg:hidden" onClick={() => setNavOpen(false)} />
+      )}
       <Sidebar
         tree={tree}
         openId={openId}
@@ -65,7 +68,7 @@ export default function App() {
         onLogs={() => setShowLogs(true)}
         onAdmin={() => setShowAdmin(true)}
       />
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         {openId ? (
           <Viewer
             key={openId}
@@ -104,37 +107,32 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-4">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white shadow-2xl p-8 flex flex-col gap-4">
-        <div className="flex flex-col items-center gap-2 mb-2">
-          <div className="grid place-items-center w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/30">
-            <Icon.Logo className="w-7 h-7" />
+    <div className="grid-dark grid min-h-screen place-items-center p-4">
+      <div className="animate-rise w-full max-w-sm">
+        <form onSubmit={submit} className="sheet-frame relative flex flex-col gap-5 rounded-lg bg-paper-50 p-8 shadow-2xl shadow-black/50">
+          <div className="flex flex-col items-center gap-3 pt-1 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-lg bg-print-600 text-white shadow-lg shadow-print-900/50 ring-1 ring-white/20">
+              <Icon.Logo className="h-8 w-8" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-ink-900">Zumen Share</h1>
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.3em] text-ink-400">図面共有 · Drawing room</p>
+            </div>
           </div>
-          <h1 className="text-xl font-bold">Zumen Share</h1>
-          <p className="text-sm text-slate-400">Sign in to your office workspace</p>
-        </div>
-        <input
-          name="email"
-          type="email"
-          required
-          placeholder="Email"
-          className="border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <input
-          name="password"
-          type="password"
-          required
-          placeholder="Password"
-          className="border border-slate-300 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button
-          disabled={busy}
-          className="bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-medium rounded-lg py-2.5 disabled:opacity-50 transition"
-        >
-          {busy ? "Signing in…" : "Log in"}
-        </button>
-      </form>
+          <Field label="Email" name="email" type="email" required autoFocus autoComplete="email" placeholder="you@office.jp" />
+          <Field label="Password" name="password" type="password" required autoComplete="current-password" placeholder="••••••••" />
+          {error && (
+            <p className="rounded-md border border-verm-200 bg-verm-50 px-3 py-2 text-sm text-verm-700">{error}</p>
+          )}
+          <Button type="submit" disabled={busy} className="mt-1">
+            {busy ? <Spinner /> : <Icon.LogOut className="h-4 w-4 rotate-180" />}
+            {busy ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
+        <p className="mt-5 text-center font-mono text-[10px] uppercase tracking-widest text-ink-500">
+          Internal use · ask an admin for an account
+        </p>
+      </div>
     </div>
   );
 }
@@ -150,48 +148,55 @@ function Home({
   onOpen: (id: string) => void;
   onMenu: () => void;
 }) {
+  const parts = tree.reduce((n, t) => n + t.ko.length, 0);
   return (
-    <div className="h-full overflow-auto blueprint-bg">
-      <header className="sticky top-0 z-10 bg-slate-100/80 backdrop-blur border-b border-slate-200 px-4 sm:px-8 py-5 flex items-center gap-3">
-        <button onClick={onMenu} className="lg:hidden grid place-items-center w-10 h-10 -ml-2 rounded-lg hover:bg-slate-200">
-          <Icon.Menu className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold">Blueprints</h1>
-          <p className="text-sm text-slate-500">
-            {tree.length} oya · {tree.reduce((n, t) => n + t.ko.length, 0)} parts
-          </p>
+    <div className="grid-paper h-full overflow-auto">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-paper-300/70 bg-paper-100/85 px-4 py-4 backdrop-blur sm:px-8">
+        <IconButton label="Menu" onClick={onMenu} className="-ml-2 lg:hidden">
+          <Icon.Menu className="h-5 w-5" />
+        </IconButton>
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-ink-900">Blueprints</h1>
+          <span className="hidden select-none text-lg font-semibold text-print-300 sm:block">図面</span>
         </div>
+        <p className="ml-auto text-right font-mono text-[10px] uppercase tracking-widest text-ink-400 sm:text-[11px]">
+          {tree.length} sheets · {parts} parts
+        </p>
       </header>
 
       {tree.length === 0 ? (
-        <div className="grid place-items-center text-center text-slate-400 py-28 px-4">
-          <div className="text-6xl mb-3 animate-bounce">😺</div>
-          <p className="font-medium text-slate-500">No blueprints yet</p>
-          <p className="text-sm">Upload your first zumen from the sidebar — the cat is getting bored.</p>
+        <div className="grid place-items-center px-4 py-24">
+          <div className="w-full max-w-md rounded-lg border-2 border-dashed border-print-200 bg-white/60 px-8 py-14 text-center">
+            <div className="mb-4 animate-bounce text-6xl">😺</div>
+            <p className="font-semibold text-ink-800">No blueprints yet</p>
+            <p className="mt-1 text-sm text-ink-500">
+              Upload your first zumen from the sidebar — the cat is getting bored.
+            </p>
+          </div>
         </div>
       ) : (
-        <main className="p-4 sm:p-8 grid gap-5 grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
+        <main className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 p-4 sm:p-8">
           {tree.map(({ oya, ko }) => (
             <button
               key={oya.id}
               onClick={() => onOpen(oya.id)}
-              className="group text-left rounded-xl bg-white ring-1 ring-slate-200 hover:ring-indigo-300 hover:shadow-lg hover:-translate-y-0.5 transition overflow-hidden"
+              className="group flex flex-col overflow-hidden rounded-lg border border-paper-300 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:border-print-400 hover:shadow-xl hover:shadow-print-900/10"
             >
-              <div className="aspect-[4/3] bg-slate-100 grid place-items-center overflow-hidden">
-                <Thumb z={oya} token={token} width={400} />
+              <div className="p-2 pb-0">
+                <div className="grid aspect-[4/3] place-items-center overflow-hidden rounded-sm border border-paper-200 bg-paper-100">
+                  <Thumb z={oya} token={token} width={400} />
+                </div>
               </div>
-              <div className="p-3">
-                <div className="font-medium truncate" title={oya.name}>
+              {/* title block, like the corner of a real drawing sheet */}
+              <div className="mt-2 border-t border-paper-200 px-3 py-2.5">
+                <div className="truncate text-sm font-semibold text-ink-900 group-hover:text-print-700" title={oya.name}>
                   {oya.name}
                 </div>
-                <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
-                  <span>{new Date(oya.created).toLocaleDateString()}</span>
-                  {ko.length > 0 && (
-                    <span className="rounded-full bg-indigo-50 text-indigo-600 px-2 py-0.5 font-medium">
-                      {ko.length} part{ko.length > 1 ? "s" : ""}
-                    </span>
-                  )}
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-400">
+                    {new Date(oya.created).toLocaleDateString()}
+                  </span>
+                  {ko.length > 0 && <Stamp>{ko.length} part{ko.length > 1 ? "s" : ""}</Stamp>}
                 </div>
               </div>
             </button>
@@ -202,11 +207,11 @@ function Home({
   );
 }
 
-const ACTION_STYLE: Record<string, string> = {
-  upload: "bg-emerald-50 text-emerald-700",
-  copy: "bg-indigo-50 text-indigo-700",
-  edit: "bg-amber-50 text-amber-700",
-  delete: "bg-red-50 text-red-700",
+const ACTION_TONE: Record<string, "leaf" | "print" | "amber" | "verm"> = {
+  upload: "leaf",
+  copy: "print",
+  edit: "amber",
+  delete: "verm",
 };
 
 function Logs({ onClose }: { onClose: () => void }) {
@@ -220,52 +225,41 @@ function Logs({ onClose }: { onClose: () => void }) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <h2 className="font-bold text-lg">Audit log</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl leading-none">
-            ×
-          </button>
-        </header>
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-slate-50 text-left text-slate-500">
-              <tr>
-                <th className="px-6 py-2 font-medium">When</th>
-                <th className="px-6 py-2 font-medium">Who</th>
-                <th className="px-6 py-2 font-medium">Action</th>
-                <th className="px-6 py-2 font-medium">Zumen</th>
+    <Modal title="Audit log" kanji="記" sub="every action, on the record" width="max-w-3xl" onClose={onClose}>
+      <div className="overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-paper-100 text-left">
+            <tr className={microCls}>
+              <th className="px-5 py-2.5 font-semibold">When</th>
+              <th className="px-5 py-2.5 font-semibold">Who</th>
+              <th className="px-5 py-2.5 font-semibold">Action</th>
+              <th className="px-5 py-2.5 font-semibold">Zumen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map((l) => (
+              <tr key={l.id} className="border-t border-paper-200 hover:bg-white">
+                <td className="whitespace-nowrap px-5 py-2.5 font-mono text-xs text-ink-500">
+                  {new Date(l.created).toLocaleString()}
+                </td>
+                <td className="px-5 py-2.5 text-ink-700">{l.user_email}</td>
+                <td className="px-5 py-2.5">
+                  <Stamp tone={ACTION_TONE[l.action] ?? "ink"}>{l.action}</Stamp>
+                </td>
+                <td className="max-w-xs truncate px-5 py-2.5 text-ink-800">{l.zumen_name}</td>
               </tr>
-            </thead>
-            <tbody>
-              {logs.map((l) => (
-                <tr key={l.id} className="border-t border-slate-100">
-                  <td className="px-6 py-2 whitespace-nowrap text-slate-500">{new Date(l.created).toLocaleString()}</td>
-                  <td className="px-6 py-2">{l.user_email}</td>
-                  <td className="px-6 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ACTION_STYLE[l.action] ?? ""}`}>
-                      {l.action}
-                    </span>
-                  </td>
-                  <td className="px-6 py-2 truncate max-w-xs">{l.zumen_name}</td>
-                </tr>
-              ))}
-              {logs.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
-                    No activity yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+            {logs.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-5 py-12 text-center text-ink-400">
+                  No activity yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -315,72 +309,53 @@ function Admin({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const field = "border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500";
-
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <h2 className="font-bold text-lg">Accounts</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl leading-none">
-            ×
-          </button>
-        </header>
+    <Modal title="Accounts" kanji="名" sub="office roster" onClose={onClose}>
+      <form onSubmit={create} className="grid gap-3 border-b border-paper-200 bg-white px-5 py-4 sm:grid-cols-2">
+        <Field label="Email" name="email" type="email" required placeholder="new@office.jp" />
+        <Field label="Name" name="name" type="text" placeholder="Tanaka" />
+        <Field label="Password" name="password" type="password" required minLength={8} placeholder="min 8 characters" />
+        <SelectField label="Role" name="role" defaultValue="user">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </SelectField>
+        <Button disabled={busy} className="sm:col-span-2">
+          {busy && <Spinner />}
+          {busy ? "Creating…" : "Create account"}
+        </Button>
+      </form>
 
-        <form onSubmit={create} className="px-6 py-4 border-b border-slate-200 grid gap-3 sm:grid-cols-2">
-          <input name="email" type="email" required placeholder="Email" className={field} />
-          <input name="name" type="text" placeholder="Name" className={field} />
-          <input name="password" type="password" required minLength={8} placeholder="Password (min 8)" className={field} />
-          <select name="role" defaultValue="user" className={field}>
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button
-            disabled={busy}
-            className="sm:col-span-2 bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-medium rounded-lg py-2.5 disabled:opacity-50 transition"
-          >
-            {busy ? "Creating…" : "Create account"}
-          </button>
-        </form>
-
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-slate-50 text-left text-slate-500">
-              <tr>
-                <th className="px-6 py-2 font-medium">Name</th>
-                <th className="px-6 py-2 font-medium">Email</th>
-                <th className="px-6 py-2 font-medium">Role</th>
-                <th className="px-6 py-2 font-medium"></th>
+      <div className="overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-paper-100 text-left">
+            <tr className={microCls}>
+              <th className="px-5 py-2.5 font-semibold">Name</th>
+              <th className="px-5 py-2.5 font-semibold">Email</th>
+              <th className="px-5 py-2.5 font-semibold">Role</th>
+              <th className="px-5 py-2.5" />
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id} className="border-t border-paper-200 hover:bg-white">
+                <td className="px-5 py-2.5 text-ink-800">{u.name || "—"}</td>
+                <td className="px-5 py-2.5 text-ink-700">{u.email}</td>
+                <td className="px-5 py-2.5">
+                  <Stamp tone={u.role === "admin" ? "print" : "ink"}>{u.role || "user"}</Stamp>
+                </td>
+                <td className="px-5 py-2.5 text-right">
+                  <button
+                    onClick={() => resetPassword(u)}
+                    className="rounded border border-paper-300 px-2 py-1 text-xs text-ink-500 transition hover:border-print-400 hover:text-print-700"
+                  >
+                    Reset password
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-t border-slate-100">
-                  <td className="px-6 py-2">{u.name || "—"}</td>
-                  <td className="px-6 py-2">{u.email}</td>
-                  <td className="px-6 py-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        u.role === "admin" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {u.role || "user"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-2 text-right">
-                    <button onClick={() => resetPassword(u)} className="text-indigo-600 hover:underline">
-                      Reset password
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </div>
+    </Modal>
   );
 }

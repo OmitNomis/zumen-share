@@ -5,10 +5,11 @@ import { pb, fileUrl, isPdf, isTiff, baseName, type Zumen } from "./lib/pb";
 import { tiffToCanvas } from "./lib/preview"; // also configures the pdf.js worker
 import Thumb from "./Thumb";
 import SwipeToDelete from "./SwipeToDelete";
+import { BTN, Button, IconButton, Modal, Spinner, Stamp } from "./ui";
 import * as Icon from "./icons";
 
 type Stroke = { color: string; width: number; points: { x: number; y: number }[] };
-const PRESETS = ["#e11d1d", "#2563eb", "#16a34a", "#eab308", "#111827"];
+const PRESETS = ["#d3381c", "#2750bb", "#16a34a", "#eab308", "#111827"];
 
 type Props = {
   id: string; // an oya or a ko (never a copy — copies are opened from the right panel)
@@ -27,7 +28,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [mode, setMode] = useState<"pan" | "pen">("pan"); // default pan so touch can scroll / pinch-zoom
   const [zoom, setZoom] = useState(1);
-  const [color, setColor] = useState("#e11d1d");
+  const [color, setColor] = useState(PRESETS[0]);
   const [penWidth, setPenWidth] = useState(3);
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(1);
@@ -343,33 +344,42 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
 
   const zoomBy = (f: number) => setZoom((z) => Math.min(4, Math.max(0.5, +(z * f).toFixed(2))));
 
-  if (!subject || !root) return <div className="h-full grid place-items-center text-slate-400">Loading…</div>;
+  if (!subject || !root)
+    return (
+      <div className="grid-dark grid h-full place-items-center">
+        <div className="flex items-center gap-3 text-ink-300">
+          <Spinner /> Loading sheet…
+        </div>
+      </div>
+    );
 
   const viewingCopy = activeId !== subject.id;
   const seg = (on: boolean) =>
-    `grid place-items-center w-10 h-9 rounded-md transition ${on ? "bg-white shadow text-indigo-600" : "text-slate-500"}`;
-  const tbtn = "grid place-items-center w-10 h-10 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-40 shrink-0";
-  const iconBtn = "grid place-items-center w-10 h-10 rounded-lg text-slate-500 hover:bg-slate-100 shrink-0";
-  const outline = "flex items-center gap-1.5 text-sm border border-slate-300 rounded-lg px-3 h-10 hover:bg-slate-50 shrink-0";
+    `grid h-9 w-10 place-items-center rounded-md transition ${
+      on ? "bg-print-600 text-white shadow-sm shadow-print-900/40" : "text-ink-500 hover:text-ink-800"
+    }`;
+  const tbtn =
+    "grid h-10 w-10 shrink-0 place-items-center rounded-md text-ink-500 transition hover:bg-paper-200/70 hover:text-ink-800 disabled:opacity-40";
 
   return (
-    <div className="h-full flex">
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-14 shrink-0 bg-white border-b border-slate-200 flex items-center gap-2 sm:gap-3 px-3 sm:px-5">
-          <button onClick={onMenu} className="lg:hidden grid place-items-center w-10 h-10 -ml-1 rounded-lg hover:bg-slate-100">
-            <Icon.Menu className="w-5 h-5" />
-          </button>
-          <div className="min-w-0 flex items-center gap-1.5 text-sm">
+    <div className="flex h-full">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* title bar */}
+        <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-paper-300 bg-paper-50 px-2 sm:gap-2 sm:px-4">
+          <IconButton label="Menu" onClick={onMenu} className="lg:hidden">
+            <Icon.Menu className="h-5 w-5" />
+          </IconButton>
+          <div className="flex min-w-0 items-center gap-1.5 text-sm">
             {subject.id !== root.id && (
               <>
                 <button
                   onClick={() => confirmDiscard() && onOpen(root.id)}
-                  className="hidden sm:block text-slate-500 hover:text-indigo-600 truncate max-w-[12rem]"
+                  className="hidden max-w-[12rem] truncate text-ink-500 transition hover:text-print-600 sm:block"
                   title={root.name}
                 >
                   {root.name}
                 </button>
-                <Icon.Chevron className="hidden sm:block w-3.5 h-3.5 text-slate-300 shrink-0" />
+                <Icon.Chevron className="hidden h-3.5 w-3.5 shrink-0 text-paper-400 sm:block" />
               </>
             )}
             {editingName ? (
@@ -384,56 +394,55 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
                     e.currentTarget.blur();
                   }
                 }}
-                className="font-semibold text-sm border border-indigo-300 rounded px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-indigo-500 max-w-[9rem] sm:max-w-[20rem]"
+                className="max-w-[9rem] rounded border border-print-300 bg-white px-1.5 py-0.5 text-sm font-semibold text-ink-900 focus:border-print-500 sm:max-w-[20rem]"
               />
             ) : (
               <button
                 onClick={() => setEditingName(true)}
                 title="Click to rename"
-                className="font-semibold truncate max-w-[9rem] sm:max-w-[20rem] hover:text-indigo-600"
+                className="max-w-[9rem] truncate font-semibold text-ink-900 transition hover:text-print-600 sm:max-w-[20rem]"
               >
                 {subject.name}
               </button>
             )}
-            {viewingCopy && (
-              <span className="shrink-0 rounded-full bg-indigo-50 text-indigo-600 text-xs px-2 py-0.5">copy</span>
-            )}
+            {viewingCopy && <Stamp>写 copy</Stamp>}
           </div>
 
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            <button onClick={downloadSheet} title="Download" className={iconBtn}>
-              <Icon.Download className="w-5 h-5" />
-            </button>
-            <button onClick={printSheet} title="Print" className={iconBtn}>
-              <Icon.Printer className="w-5 h-5" />
-            </button>
-            <button onClick={() => setAttachOpen(true)} disabled={!!busy} className={outline}>
-              <Icon.Plus className="w-4 h-4" />
+          <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
+            <IconButton label="Download" onClick={downloadSheet}>
+              <Icon.Download className="h-5 w-5" />
+            </IconButton>
+            <IconButton label="Print" onClick={printSheet}>
+              <Icon.Printer className="h-5 w-5" />
+            </IconButton>
+            <Button variant="outline" onClick={() => setAttachOpen(true)} disabled={!!busy} className="h-9 px-2.5 sm:px-3">
+              <Icon.Plus className="h-4 w-4" />
               <span className="hidden sm:inline">{busy || "Attach part"}</span>
-            </button>
-            <button onClick={() => setCopiesOpen(true)} className={`xl:hidden ${outline}`} title="Copies">
-              <Icon.Copies className="w-4 h-4" />
-              {copies.length}
-            </button>
-            <button
+            </Button>
+            <Button variant="outline" onClick={() => setCopiesOpen(true)} className="h-9 px-2.5 xl:hidden" title="Copies">
+              <Icon.Copies className="h-4 w-4" />
+              <span className="font-mono text-xs tabular-nums">{copies.length}</span>
+            </Button>
+            <IconButton
+              danger
+              label={subject.id === root.id ? "Delete blueprint" : "Delete part"}
               onClick={delSubject}
-              title={subject.id === root.id ? "Delete blueprint" : "Delete part"}
-              className="grid place-items-center w-10 h-10 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 shrink-0"
             >
-              <Icon.Trash className="w-5 h-5" />
-            </button>
+              <Icon.Trash className="h-5 w-5" />
+            </IconButton>
           </div>
         </header>
 
-        <main className="flex-1 relative overflow-auto blueprint-bg p-4 sm:p-6 pb-28">
+        {/* light table */}
+        <main className="grid-dark relative flex-1 overflow-auto p-4 pb-28 sm:p-6">
           <div
-            className="relative bg-white shadow-xl ring-1 ring-black/5 mx-auto"
+            className="relative mx-auto bg-white shadow-2xl shadow-black/60 ring-1 ring-white/10"
             style={{ width: `${zoom * 100}%`, maxWidth: 1600 * zoom }}
           >
-            <canvas ref={baseRef} className="block w-full h-auto" />
+            <canvas ref={baseRef} className="block h-auto w-full" />
             <canvas
               ref={drawRef}
-              className={`absolute inset-0 w-full h-full ${mode === "pen" ? "cursor-crosshair" : "pointer-events-none"}`}
+              className={`absolute inset-0 h-full w-full ${mode === "pen" ? "cursor-crosshair" : "pointer-events-none"}`}
               style={{ touchAction: mode === "pen" ? "none" : "auto" }}
               onPointerDown={down}
               onPointerMove={move}
@@ -442,50 +451,58 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
             />
           </div>
 
-          {/* floating toolbar */}
-          <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 max-w-[94vw] z-20">
-            <div className="flex items-center gap-1.5 sm:gap-2 bg-white rounded-2xl shadow-xl ring-1 ring-slate-200 px-2 sm:px-3 py-2 overflow-x-auto">
-              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 shrink-0">
+          {/* instrument tray */}
+          <div className="fixed bottom-4 left-1/2 z-20 max-w-[94vw] -translate-x-1/2 sm:bottom-6">
+            <div className="flex items-center gap-1.5 overflow-x-auto rounded-xl bg-paper-50/95 px-2 py-1.5 shadow-2xl shadow-black/50 ring-1 ring-ink-900/15 backdrop-blur sm:gap-2 sm:px-3 sm:py-2">
+              <div className="flex shrink-0 items-center rounded-lg bg-paper-200/80 p-0.5">
                 <button onClick={() => setMode("pan")} className={seg(mode === "pan")} title="Pan / zoom">
-                  <Icon.Move className="w-5 h-5" />
+                  <Icon.Move className="h-5 w-5" />
                 </button>
                 <button onClick={() => setMode("pen")} className={seg(mode === "pen")} title="Draw">
-                  <Icon.Pen className="w-5 h-5" />
+                  <Icon.Pen className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="w-px h-6 bg-slate-200 shrink-0" />
+              <div className="h-6 w-px shrink-0 bg-paper-300" />
               <button onClick={() => zoomBy(0.8)} className={tbtn} title="Zoom out">
-                <Icon.ZoomOut className="w-5 h-5" />
+                <Icon.ZoomOut className="h-5 w-5" />
               </button>
-              <button onClick={() => setZoom(1)} className="text-xs tabular-nums w-11 text-center text-slate-600 shrink-0" title="Reset zoom">
+              <button
+                onClick={() => setZoom(1)}
+                className="w-11 shrink-0 text-center font-mono text-[11px] tabular-nums text-ink-500 transition hover:text-ink-800"
+                title="Reset zoom"
+              >
                 {Math.round(zoom * 100)}%
               </button>
               <button onClick={() => zoomBy(1.25)} className={tbtn} title="Zoom in">
-                <Icon.ZoomIn className="w-5 h-5" />
+                <Icon.ZoomIn className="h-5 w-5" />
               </button>
 
               {mode === "pen" && (
                 <>
-                  <div className="w-px h-6 bg-slate-200 shrink-0" />
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="h-6 w-px shrink-0 bg-paper-300" />
+                  <div className="flex shrink-0 items-center gap-1.5">
                     {PRESETS.map((c) => (
                       <button
                         key={c}
                         onClick={() => setColor(c)}
                         style={{ background: c }}
-                        className={`w-7 h-7 rounded-full transition ${
-                          color === c ? "ring-2 ring-offset-2 ring-slate-400" : ""
+                        title="Pen color"
+                        className={`h-7 w-7 rounded-full transition ${
+                          color === c ? "ring-2 ring-print-500 ring-offset-2 ring-offset-paper-50" : "hover:scale-110"
                         }`}
                       />
                     ))}
-                    <label className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-slate-300 cursor-pointer grid place-items-center relative">
-                      <Icon.Pen className="w-3.5 h-3.5 text-slate-500" />
+                    <label
+                      className="relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full ring-1 ring-paper-300"
+                      title="Custom color"
+                    >
+                      <Icon.Pen className="h-3.5 w-3.5 text-ink-400" />
                       <input
                         type="color"
                         value={color}
                         onChange={(e) => setColor(e.target.value)}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        className="absolute inset-0 cursor-pointer opacity-0"
                       />
                     </label>
                   </div>
@@ -495,34 +512,40 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
                     max={20}
                     value={penWidth}
                     onChange={(e) => setPenWidth(+e.target.value)}
-                    className="w-20 accent-indigo-600 shrink-0"
+                    className="w-20 shrink-0 accent-print-600"
                     title={`Pen width ${penWidth}px`}
                   />
                   <button onClick={() => setStrokes((s) => s.slice(0, -1))} className={tbtn} title="Undo">
-                    <Icon.Undo className="w-5 h-5" />
+                    <Icon.Undo className="h-5 w-5" />
                   </button>
                   <button onClick={() => setStrokes([])} className={tbtn} title="Clear marks">
-                    <Icon.Eraser className="w-5 h-5" />
+                    <Icon.Eraser className="h-5 w-5" />
                   </button>
                 </>
               )}
 
               {numPages > 1 && (
                 <>
-                  <div className="w-px h-6 bg-slate-200 shrink-0" />
-                  <div className="flex items-center gap-1 text-sm text-slate-600 shrink-0">
-                    <button onClick={() => confirmDiscard() && setPage((p) => Math.max(1, p - 1))} className={tbtn} disabled={page <= 1}>
-                      ‹
+                  <div className="h-6 w-px shrink-0 bg-paper-300" />
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => confirmDiscard() && setPage((p) => Math.max(1, p - 1))}
+                      className={tbtn}
+                      disabled={page <= 1}
+                      title="Previous page"
+                    >
+                      <Icon.Chevron className="h-4 w-4 rotate-180" />
                     </button>
-                    <span className="tabular-nums w-10 text-center">
+                    <span className="w-10 text-center font-mono text-xs tabular-nums text-ink-600">
                       {page}/{numPages}
                     </span>
                     <button
                       onClick={() => confirmDiscard() && setPage((p) => Math.min(numPages, p + 1))}
                       className={tbtn}
                       disabled={page >= numPages}
+                      title="Next page"
                     >
-                      ›
+                      <Icon.Chevron className="h-4 w-4" />
                     </button>
                   </div>
                 </>
@@ -533,22 +556,28 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
       </div>
 
       {/* right panel: copies of the current drawing — drawer below xl, static on xl */}
-      {copiesOpen && <div className="fixed inset-0 bg-slate-900/50 z-30 xl:hidden" onClick={() => setCopiesOpen(false)} />}
+      {copiesOpen && (
+        <div className="animate-fade fixed inset-0 z-30 bg-ink-950/60 backdrop-blur-[2px] xl:hidden" onClick={() => setCopiesOpen(false)} />
+      )}
       <aside
-        className={`fixed xl:static inset-y-0 right-0 z-40 w-72 xl:w-64 shrink-0 bg-white border-l border-slate-200 flex flex-col transform transition-transform xl:translate-x-0 ${
+        className={`fixed inset-y-0 right-0 z-40 flex w-72 shrink-0 transform flex-col border-l border-paper-300 bg-paper-50 transition-transform xl:static xl:w-64 xl:translate-x-0 ${
           copiesOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <header className="px-4 py-3.5 border-b border-slate-200 flex items-center gap-2">
-          <Icon.Copies className="w-4 h-4 text-slate-500" />
-          <span className="font-semibold text-sm">Copies</span>
-          <span className="ml-auto text-xs text-slate-400">{copies.length}</span>
-          <button onClick={() => setCopiesOpen(false)} className="xl:hidden grid place-items-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100">
-            <Icon.X className="w-4 h-4" />
-          </button>
+        <header className="flex items-center gap-2.5 border-b border-paper-200 bg-white px-3.5 py-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-print-200 bg-print-50 text-sm font-semibold text-print-700 select-none">
+            写
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold leading-tight text-ink-900">Copies</div>
+            <div className="font-mono text-[9px] uppercase tracking-widest text-ink-400">{copies.length} saved</div>
+          </div>
+          <IconButton label="Close copies" onClick={() => setCopiesOpen(false)} className="h-8 w-8 xl:hidden">
+            <Icon.X className="h-4 w-4" />
+          </IconButton>
         </header>
 
-        <div className="flex-1 overflow-auto p-2.5 flex flex-col gap-2">
+        <div className="flex flex-1 flex-col gap-2 overflow-auto p-2.5">
           <ThumbRow z={subject} token={token} label="Original" active={!viewingCopy} onClick={() => view(subject.id)} />
           {copies.map((c, i) => (
             <SwipeToDelete key={c.id} onDelete={() => delCopy(c.id)}>
@@ -564,35 +593,30 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
             </SwipeToDelete>
           ))}
           {copies.length === 0 && (
-            <p className="text-xs text-slate-400 text-center px-3 py-6">
-              No copies yet. Switch to the pen, mark up the sheet, then save a copy below.
-            </p>
+            <div className="mx-1 mt-1 rounded-md border border-dashed border-paper-300 px-3 py-6 text-center text-xs leading-relaxed text-ink-400">
+              No copies yet.
+              <br />
+              Switch to the pen, mark up the sheet, then save a copy below.
+            </div>
           )}
         </div>
 
-        <div className="p-3 border-t border-slate-200 flex flex-col gap-2">
+        <div className="flex flex-col gap-2 border-t border-paper-200 bg-white p-3">
           {viewingCopy && (
-            <button
-              onClick={() => save(true)}
-              disabled={!!busy}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 transition"
-            >
-              <Icon.Pen className="w-4 h-4" />
+            <Button onClick={() => save(true)} disabled={!!busy} className="w-full">
+              {busy ? <Spinner /> : <Icon.Pen className="h-4 w-4" />}
               {busy || "Save"}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant={viewingCopy ? "outline" : "primary"}
             onClick={() => save(false)}
             disabled={!!busy}
-            className={`w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium disabled:opacity-50 transition ${
-              viewingCopy
-                ? "border border-slate-300 text-slate-600 hover:bg-slate-50"
-                : "bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white"
-            }`}
+            className="w-full"
           >
-            <Icon.Copies className="w-4 h-4" />
+            {busy && !viewingCopy ? <Spinner /> : <Icon.Copies className="h-4 w-4" />}
             {viewingCopy ? "Save as new copy" : busy || "Save marked-up copy"}
-          </button>
+          </Button>
         </div>
       </aside>
 
@@ -639,56 +663,38 @@ function AttachPart({
   }, [rootId]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          <h2 className="font-bold text-lg">Attach a part</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl leading-none">
-            ×
-          </button>
-        </header>
-
-        <div className="p-4 border-b border-slate-200">
-          <label className="flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium text-white cursor-pointer bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 transition">
-            <Icon.Upload className="w-4 h-4" />
-            Upload new file(s)
-            <input
-              type="file"
-              multiple
-              accept="image/*,.pdf"
-              className="hidden"
-              onChange={(e) => onUpload(e.target.files)}
-            />
-          </label>
-        </div>
-
-        <div className="px-4 py-2 text-xs font-medium text-slate-400">Or add an existing blueprint</div>
-        <div className="flex-1 overflow-auto p-4 pt-0 grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-          {candidates.map((z) => (
-            <button
-              key={z.id}
-              onClick={() => onAttach(z.id)}
-              className="text-left rounded-xl bg-white ring-1 ring-slate-200 hover:ring-indigo-300 hover:shadow-md transition overflow-hidden"
-            >
-              <div className="aspect-[4/3] bg-slate-100 grid place-items-center overflow-hidden">
-                <Thumb z={z} token={token} width={280} />
-              </div>
-              <div className="p-2 text-sm truncate" title={z.name}>
-                {z.name}
-              </div>
-            </button>
-          ))}
-          {candidates.length === 0 && (
-            <p className="col-span-full text-center text-sm text-slate-400 py-8">
-              No standalone blueprints to attach.
-            </p>
-          )}
-        </div>
+    <Modal title="Attach a part" kanji="部" sub="add a ko under this sheet" onClose={onClose}>
+      <div className="border-b border-paper-200 bg-white p-4">
+        <label className={`${BTN.primary} w-full cursor-pointer`}>
+          <Icon.Upload className="h-4 w-4" />
+          Upload new file(s)
+          <input type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => onUpload(e.target.files)} />
+        </label>
       </div>
-    </div>
+
+      <div className="px-5 pb-2 pt-4 font-mono text-[10px] font-semibold uppercase tracking-widest text-ink-400">
+        Or re-home an existing blueprint
+      </div>
+      <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 overflow-auto p-4 pt-0">
+        {candidates.map((z) => (
+          <button
+            key={z.id}
+            onClick={() => onAttach(z.id)}
+            className="overflow-hidden rounded-lg border border-paper-300 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-print-400 hover:shadow-md"
+          >
+            <div className="grid aspect-[4/3] place-items-center overflow-hidden border-b border-paper-200 bg-paper-100">
+              <Thumb z={z} token={token} width={280} />
+            </div>
+            <div className="truncate p-2 text-sm text-ink-800" title={z.name}>
+              {z.name}
+            </div>
+          </button>
+        ))}
+        {candidates.length === 0 && (
+          <p className="col-span-full py-8 text-center text-sm text-ink-400">No standalone blueprints to attach.</p>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -710,28 +716,32 @@ function ThumbRow({
   onDelete?: () => void;
 }) {
   return (
-    <div className="relative group">
+    <div className="group relative">
       <button
         onClick={onClick}
-        className={`w-full flex items-center gap-2.5 rounded-lg p-1.5 text-left ring-1 transition ${
-          active ? "ring-indigo-500 bg-indigo-50" : "ring-slate-200 bg-white hover:ring-slate-300 hover:bg-slate-50"
+        className={`flex w-full items-center gap-2.5 rounded-md border p-1.5 text-left transition ${
+          active
+            ? "border-print-500 bg-print-50 shadow-sm shadow-print-900/10"
+            : "border-paper-300 bg-white hover:border-print-300"
         }`}
       >
-        <div className="w-12 h-12 rounded-md bg-slate-100 grid place-items-center overflow-hidden shrink-0">
+        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-sm border border-paper-200 bg-paper-100">
           <Thumb z={z} token={token} width={120} />
         </div>
         <div className="min-w-0">
-          <div className={`text-sm truncate ${active ? "font-semibold text-indigo-700" : ""}`}>{label}</div>
-          {sub && <div className="text-xs text-slate-400">{sub}</div>}
+          <div className={`truncate text-sm ${active ? "font-semibold text-print-800" : "font-medium text-ink-800"}`}>
+            {label}
+          </div>
+          {sub && <div className="font-mono text-[10px] uppercase tracking-wider text-ink-400">{sub}</div>}
         </div>
       </button>
       {onDelete && (
         <button
           onClick={onDelete}
           title="Delete copy"
-          className="absolute top-1 right-1 grid place-items-center w-7 h-7 rounded-md bg-white/90 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition"
+          className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-white/90 text-ink-300 opacity-0 shadow-sm transition hover:text-verm-600 group-hover:opacity-100"
         >
-          <Icon.Trash className="w-4 h-4" />
+          <Icon.Trash className="h-4 w-4" />
         </button>
       )}
     </div>

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { pb, isPdf, isAdmin, baseName, type Zumen } from "./lib/pb";
+import { BTN, IconButton, Spinner } from "./ui";
 import * as Icon from "./icons";
 
 export type OyaNode = { oya: Zumen; ko: Zumen[] };
@@ -73,45 +74,49 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
     });
   }
 
+  const me = pb.authStore.record;
+  const footBtn =
+    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-ink-300 transition hover:bg-white/5 hover:text-white";
+
   return (
     <aside
-      className={`fixed lg:static inset-y-0 left-0 z-40 w-72 shrink-0 bg-slate-900 text-slate-300 flex flex-col transform transition-transform lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-40 flex w-72 shrink-0 transform flex-col border-r border-ink-800 bg-ink-950 text-ink-200 transition-transform lg:static lg:translate-x-0 ${
         open ? "translate-x-0" : "-translate-x-full"
       }`}
     >
-      <div className="relative flex items-center h-16 pr-2">
-        <button onClick={logoTap} className="flex items-center gap-2.5 px-4 h-full flex-1 hover:bg-slate-800/60 transition">
-          <div className="grid place-items-center w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shrink-0 shadow-lg shadow-indigo-500/20">
-            <Icon.Logo className="w-5 h-5" />
+      {/* brand block */}
+      <div className="relative flex h-16 items-center border-b border-ink-800/70 pr-2">
+        <button onClick={logoTap} className="flex h-full flex-1 items-center gap-3 px-4 transition hover:bg-white/5">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-print-600 text-white shadow-lg shadow-print-900/50 ring-1 ring-white/20">
+            <Icon.Logo className="h-5 w-5" />
           </div>
-          <span className="font-bold text-white text-lg">Zumen Share</span>
+          <div className="min-w-0 text-left">
+            <div className="truncate font-bold leading-tight text-white">Zumen Share</div>
+            <div className="font-mono text-[9px] uppercase tracking-[0.3em] text-ink-400">図面共有</div>
+          </div>
         </button>
-        <button onClick={onClose} className="lg:hidden grid place-items-center w-10 h-10 rounded-lg text-slate-400 hover:bg-slate-800">
-          <Icon.X className="w-5 h-5" />
-        </button>
+        <IconButton dark label="Close menu" onClick={onClose} className="lg:hidden">
+          <Icon.X className="h-5 w-5" />
+        </IconButton>
         {meow && (
-          <span className="absolute left-16 top-14 z-10 text-xs bg-white text-slate-800 rounded-full px-2.5 py-1 shadow-lg animate-bounce">
+          <span className="absolute left-16 top-14 z-10 animate-bounce rounded-full bg-white px-2.5 py-1 text-xs text-ink-900 shadow-lg">
             =^･ω･^= meow!
           </span>
         )}
       </div>
 
-      <div className="px-3 pb-3 flex flex-col gap-2">
+      <div className="flex flex-col gap-2 p-3">
         <div className="relative">
-          <Icon.Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Icon.Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search oya & ko…"
-            className="w-full bg-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-md border border-ink-700 bg-ink-900 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-ink-400 transition focus:border-print-400"
           />
         </div>
-        <label
-          className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium text-white cursor-pointer transition ${
-            busy ? "bg-indigo-500/60" : "bg-gradient-to-br from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700"
-          }`}
-        >
-          <Icon.Upload className="w-4 h-4" />
+        <label className={`${BTN.primary} w-full ${busy ? "pointer-events-none opacity-70" : "cursor-pointer"}`}>
+          {busy ? <Spinner /> : <Icon.Upload className="h-4 w-4" />}
           {busy || "Upload blueprint"}
           <input
             type="file"
@@ -124,38 +129,47 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
         </label>
       </div>
 
+      <div className="flex items-baseline justify-between px-4 pb-1.5 pt-1">
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-ink-500">Index</span>
+        <span className="font-mono text-[10px] tabular-nums text-ink-500">{nodes.length}</span>
+      </div>
+
       <nav className="flex-1 overflow-auto px-2 pb-2">
         {nodes.length === 0 && (
-          <p className="text-sm text-slate-500 text-center py-8">{ql ? "No matches." : "No blueprints yet."}</p>
+          <p className="px-3 py-8 text-center text-sm text-ink-500">{ql ? "No matches." : "No blueprints yet."}</p>
         )}
         {nodes.map(({ oya, ko }) => {
           const hasKo = ko.length > 0;
           const isOpen = ql !== "" || expanded.has(oya.id) || openId === oya.id || ko.some((k) => k.id === openId);
+          const activeOya = openId === oya.id;
           return (
             <div key={oya.id} className="mb-0.5">
               <div
-                className={`group flex items-center rounded-lg ${
-                  openId === oya.id ? "bg-indigo-600 text-white" : "hover:bg-slate-800 text-slate-200"
+                className={`group flex items-center rounded-md transition ${
+                  activeOya ? "bg-print-600 text-white shadow-md shadow-print-900/40" : "text-ink-200 hover:bg-white/5"
                 }`}
               >
                 <button
                   onClick={() => hasKo && toggle(oya.id)}
-                  className={`w-9 h-10 grid place-items-center shrink-0 ${hasKo ? "" : "invisible"}`}
+                  className={`grid h-10 w-8 shrink-0 place-items-center ${hasKo ? "" : "invisible"} ${
+                    activeOya ? "text-white/70" : "text-ink-400"
+                  }`}
                   tabIndex={hasKo ? 0 : -1}
+                  aria-label={isOpen ? "Collapse parts" : "Expand parts"}
                 >
-                  <Icon.Chevron className={`w-4 h-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                  <Icon.Chevron className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
                 </button>
                 <button
                   onClick={() => onOpen(oya.id)}
                   title={oya.name}
-                  className="flex-1 min-w-0 flex items-center gap-2 pr-2 py-2 text-sm"
+                  className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-2 text-sm"
                 >
-                  <Glyph z={oya} className="w-4 h-4 shrink-0 opacity-70" />
-                  <span className="truncate flex-1 text-left">{oya.name}</span>
+                  <Glyph z={oya} className="h-4 w-4 shrink-0 opacity-60" />
+                  <span className="flex-1 truncate text-left">{oya.name}</span>
                   {hasKo && (
                     <span
-                      className={`text-xs rounded-full px-1.5 py-0.5 shrink-0 ${
-                        openId === oya.id ? "bg-white/20" : "bg-slate-700 text-slate-300"
+                      className={`shrink-0 rounded-sm border px-1 font-mono text-[10px] tabular-nums ${
+                        activeOya ? "border-white/30 text-white/90" : "border-ink-700 text-ink-400"
                       }`}
                     >
                       {ko.length}
@@ -165,17 +179,19 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
               </div>
 
               {isOpen && hasKo && (
-                <div className="ml-4 pl-3 border-l border-slate-700 mt-0.5 flex flex-col">
+                <div className="ml-[1.35rem] mt-0.5 flex flex-col border-l border-ink-800 pl-2.5">
                   {ko.map((k) => (
                     <button
                       key={k.id}
                       onClick={() => onOpen(k.id)}
                       title={k.name}
-                      className={`flex items-center gap-2 rounded-md px-2 py-2.5 text-sm ${
-                        openId === k.id ? "bg-indigo-600 text-white" : "hover:bg-slate-800 text-slate-400"
+                      className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm transition ${
+                        openId === k.id
+                          ? "bg-print-600 text-white shadow-md shadow-print-900/40"
+                          : "text-ink-400 hover:bg-white/5 hover:text-ink-200"
                       }`}
                     >
-                      <Glyph z={k} className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                      <Glyph z={k} className="h-3.5 w-3.5 shrink-0 opacity-60" />
                       <span className="truncate text-left">{k.name}</span>
                     </button>
                   ))}
@@ -186,40 +202,28 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
         })}
       </nav>
 
-      <div className="border-t border-slate-800 p-3 flex flex-col gap-1">
+      <div className="flex flex-col gap-1 border-t border-ink-800 p-3">
         {isAdmin() && (
-          <button
-            onClick={onAdmin}
-            className="flex items-center gap-2 rounded-lg px-2 py-2.5 text-sm text-slate-300 hover:bg-slate-800"
-          >
-            <Icon.Users className="w-4 h-4" /> Accounts
+          <button onClick={onAdmin} className={footBtn}>
+            <Icon.Users className="h-4 w-4" /> Accounts
           </button>
         )}
-        <button
-          onClick={onLogs}
-          className="flex items-center gap-2 rounded-lg px-2 py-2.5 text-sm text-slate-300 hover:bg-slate-800"
-        >
-          <Icon.List className="w-4 h-4" /> Audit log
+        <button onClick={onLogs} className={footBtn}>
+          <Icon.List className="h-4 w-4" /> Audit log
         </button>
-        <div className="flex items-center gap-2 px-2 pt-1">
-          <div className="grid place-items-center w-7 h-7 rounded-full bg-slate-700 text-xs font-semibold text-white shrink-0 uppercase">
-            {(pb.authStore.record?.name || pb.authStore.record?.email)?.[0] ?? "?"}
+        <div className="mt-1 flex items-center gap-2.5 rounded-md border border-ink-800 bg-ink-900/60 p-2">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-ink-700 font-mono text-xs font-semibold uppercase text-white ring-1 ring-ink-600">
+            {(me?.name || me?.email)?.[0] ?? "?"}
           </div>
-          <div className="min-w-0 flex-1" title={pb.authStore.record?.email}>
-            <div className="text-sm text-slate-200 truncate">
-              {pb.authStore.record?.name || pb.authStore.record?.email}
+          <div className="min-w-0 flex-1" title={me?.email}>
+            <div className="truncate text-sm text-white">{me?.name || me?.email}</div>
+            <div className="truncate font-mono text-[10px] text-ink-400">
+              {me?.name ? me?.email : isAdmin() ? "admin" : "user"}
             </div>
-            {pb.authStore.record?.name && (
-              <div className="text-xs text-slate-500 truncate">{pb.authStore.record?.email}</div>
-            )}
           </div>
-          <button
-            onClick={() => pb.authStore.clear()}
-            title="Log out"
-            className="grid place-items-center w-9 h-9 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-          >
-            <Icon.LogOut className="w-4 h-4" />
-          </button>
+          <IconButton dark label="Log out" onClick={() => pb.authStore.clear()} className="h-9 w-9">
+            <Icon.LogOut className="h-4 w-4" />
+          </IconButton>
         </div>
       </div>
     </aside>

@@ -36,7 +36,7 @@ export default function Thumb({ z, token, width = 400 }: { z: Zumen; token: stri
 
   if (!src) {
     const Glyph = isPdf(z) ? Icon.Pdf : Icon.Image;
-    return <Glyph className="w-1/3 h-1/3 text-slate-300" />;
+    return <Glyph className="w-1/3 h-1/3 text-paper-400/70" />;
   }
   return <img src={src} alt="" className="w-full h-full object-cover" />;
 }

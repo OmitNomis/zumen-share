@@ -37,11 +37,11 @@ export default function SwipeToDelete({ onDelete, children }: { onDelete: () => 
   }
 
   return (
-    <div className="relative overflow-hidden rounded-lg">
+    <div className="relative overflow-hidden rounded-md">
       <button
         onClick={onDelete}
         title="Delete copy"
-        className="absolute inset-y-0 right-0 flex items-center justify-center bg-red-500 text-white active:bg-red-600"
+        className="absolute inset-y-0 right-0 flex items-center justify-center bg-verm-500 text-white active:bg-verm-600"
         style={{ width: W }}
       >
         <Icon.Trash className="w-5 h-5" />
