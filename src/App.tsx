@@ -183,7 +183,7 @@ function Home({
               className="group flex flex-col overflow-hidden rounded-lg border border-paper-300 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:border-print-400 hover:shadow-xl hover:shadow-print-900/10"
             >
               <div className="p-2 pb-0">
-                <div className="grid aspect-[4/3] place-items-center overflow-hidden rounded-sm border border-paper-200 bg-paper-100">
+                <div className="grid aspect-4/3 place-items-center overflow-hidden rounded-sm border border-paper-200 bg-paper-100">
                   <Thumb z={oya} token={token} width={400} />
                 </div>
               </div>

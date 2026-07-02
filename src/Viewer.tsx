@@ -374,7 +374,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
               <>
                 <button
                   onClick={() => confirmDiscard() && onOpen(root.id)}
-                  className="hidden max-w-[12rem] truncate text-ink-500 transition hover:text-print-600 sm:block"
+                  className="hidden max-w-48 truncate text-ink-500 transition hover:text-print-600 sm:block"
                   title={root.name}
                 >
                   {root.name}
@@ -394,13 +394,13 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
                     e.currentTarget.blur();
                   }
                 }}
-                className="max-w-[9rem] rounded border border-print-300 bg-white px-1.5 py-0.5 text-sm font-semibold text-ink-900 focus:border-print-500 sm:max-w-[20rem]"
+                className="max-w-36 rounded border border-print-300 bg-white px-1.5 py-0.5 text-sm font-semibold text-ink-900 focus:border-print-500 sm:max-w-[20rem]"
               />
             ) : (
               <button
                 onClick={() => setEditingName(true)}
                 title="Click to rename"
-                className="max-w-[9rem] truncate font-semibold text-ink-900 transition hover:text-print-600 sm:max-w-[20rem]"
+                className="max-w-36 truncate font-semibold text-ink-900 transition hover:text-print-600 sm:max-w-[20rem]"
               >
                 {subject.name}
               </button>
@@ -682,7 +682,7 @@ function AttachPart({
             onClick={() => onAttach(z.id)}
             className="overflow-hidden rounded-lg border border-paper-300 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-print-400 hover:shadow-md"
           >
-            <div className="grid aspect-[4/3] place-items-center overflow-hidden border-b border-paper-200 bg-paper-100">
+            <div className="grid aspect-4/3 place-items-center overflow-hidden border-b border-paper-200 bg-paper-100">
               <Thumb z={z} token={token} width={280} />
             </div>
             <div className="truncate p-2 text-sm text-ink-800" title={z.name}>
