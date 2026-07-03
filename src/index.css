@@ -1,4 +1,12 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* dark: variants only apply under a .dark ancestor class, which this app never adds —
+   there's no dark-mode toggle; "ink" is a permanently-dark surface, not a theme mode.
+   Kept (rather than deleted) so vendored shadcn component internals that reference
+   dark: classes stay inert instead of reacting to the OS color-scheme media query. */
+@custom-variant dark (&:is(.dark *));
 
 /* ── drafting-room theme ──────────────────────────────────────────────
    paper  — warm light surfaces (cards, panels)
@@ -42,6 +50,14 @@
   --color-verm-600: #b02e16;
   --color-verm-700: #8f2612;
 }
+
+/* ── z-index scale ────────────────────────────────────────────────────
+   10  in-flow sticky chrome (page headers) and small in-place badges
+   20  floating overlays scoped to one page (Viewer's instrument tray, Home's drop overlay)
+   30  mobile drawer backdrops (Sidebar / Copies)
+   40  the mobile drawers themselves
+   50  Radix portals — AlertDialog, Sheet, Select (shadcn default; don't override)
+   100 CatEasterEgg — must beat everything */
 
 html,
 body,
@@ -130,4 +146,69 @@ body {
   animation: catfall linear forwards;
   user-select: none;
   pointer-events: none;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* shadcn component theme, mapped onto the drafting-room palette above
+   instead of shadcn's stock neutral/oklch defaults. */
+:root {
+  --background: var(--color-paper-50);
+  --foreground: var(--color-ink-800);
+  --card: var(--color-paper-50);
+  --card-foreground: var(--color-ink-900);
+  --popover: var(--color-paper-50);
+  --popover-foreground: var(--color-ink-900);
+  --primary: var(--color-print-600);
+  --primary-foreground: #fff;
+  --secondary: var(--color-paper-200);
+  --secondary-foreground: var(--color-ink-700);
+  --muted: var(--color-paper-200);
+  --muted-foreground: var(--color-ink-700);
+  --accent: var(--color-paper-200);
+  --accent-foreground: var(--color-ink-700);
+  --destructive: var(--color-verm-600);
+  --border: var(--color-paper-300);
+  --input: var(--color-paper-300);
+  --ring: var(--color-print-500);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

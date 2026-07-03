@@ -1,8 +1,16 @@
-/* eslint-disable react-refresh/only-export-components -- class-string constants (BTN, fieldCls…) live beside the components that use them */
-import * as Icon from "./icons";
+/* eslint-disable react-refresh/only-export-components -- class-string constants (BTN, microCls…) live beside the components that use them */
+import { X } from "lucide-react";
+import { IconButton } from "./components/ui/icon-button";
 
-/* Shared primitives for the drafting-room look: buttons, stamps (badges),
-   labeled fields, modal shell, icon buttons, spinner. */
+/* Button/IconButton/Spinner/Stamp live in src/components/ui/* (shadcn-based) and are
+   re-exported here so existing call sites don't need two import paths. Modal/Field/
+   SelectField/BTN/microCls are small bespoke helpers with no shadcn equivalent, kept
+   here: Modal backs AttachPart's centered overlay, Field/SelectField back Login/Admin's
+   title-block-style labeled inputs. */
+export { Button } from "./components/ui/button";
+export { IconButton } from "./components/ui/icon-button";
+export { Spinner } from "./components/ui/spinner";
+export { Stamp } from "./components/ui/stamp";
 
 const btnBase =
   "inline-flex items-center justify-center gap-2 rounded-md h-10 px-3.5 text-sm font-medium transition select-none disabled:opacity-50 disabled:pointer-events-none";
@@ -14,68 +22,10 @@ export const BTN = {
   danger: `${btnBase} bg-verm-600 text-white hover:bg-verm-500`,
 } as const;
 
-export function Button({
-  variant = "primary",
-  className = "",
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof BTN }) {
-  return <button className={`${BTN[variant]} ${className}`} {...rest} />;
-}
-
-export function IconButton({
-  label,
-  danger = false,
-  dark = false,
-  className = "",
-  children,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; danger?: boolean; dark?: boolean }) {
-  const hover = danger
-    ? "hover:bg-verm-50 hover:text-verm-600"
-    : dark
-      ? "hover:bg-white/10 hover:text-white"
-      : "hover:bg-paper-200/70 hover:text-ink-800";
-  return (
-    <button
-      title={label}
-      aria-label={label}
-      className={`grid h-10 w-10 shrink-0 place-items-center rounded-md transition ${
-        dark ? "text-ink-300" : danger ? "text-ink-400" : "text-ink-500"
-      } ${hover} disabled:opacity-40 disabled:pointer-events-none ${className}`}
-      {...rest}
-    >
-      {children}
-    </button>
-  );
-}
-
-export const Spinner = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <span className={`inline-block animate-spin rounded-full border-2 border-current border-t-transparent ${className}`} />
-);
-
-/* inspection-stamp badge: bordered, mono, uppercase */
-const STAMP = {
-  print: "border-print-200 bg-print-50 text-print-700",
-  verm: "border-verm-200 bg-verm-50 text-verm-600",
-  leaf: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  amber: "border-amber-200 bg-amber-50 text-amber-700",
-  ink: "border-paper-300 bg-paper-100 text-ink-500",
-} as const;
-
-export function Stamp({ tone = "print", children }: { tone?: keyof typeof STAMP; children: React.ReactNode }) {
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center rounded-[3px] border px-1.5 py-px font-mono text-[10px] font-semibold uppercase tracking-wider ${STAMP[tone]}`}
-    >
-      {children}
-    </span>
-  );
-}
-
 /* mono microtype label, like the lettering in a title block */
 export const microCls = "font-mono text-[10px] font-semibold uppercase tracking-widest text-ink-400";
 
-export const fieldCls =
+const fieldCls =
   "w-full rounded-md border border-paper-300 bg-white px-3 py-2.5 text-sm text-ink-900 placeholder:text-ink-300 transition focus:border-print-500";
 
 export function Field({
@@ -105,7 +55,9 @@ export function SelectField({
   );
 }
 
-/* modal shell with a title-block header: kanji seal + title + mono sublabel */
+/* modal shell with a title-block header: kanji seal + title + mono sublabel.
+   Used by AttachPart, rendered at the nested /z/:id/attach route as an overlay
+   over the still-mounted Viewer canvas. */
 export function Modal({
   title,
   kanji,
@@ -141,7 +93,7 @@ export function Modal({
             {sub && <p className={`${microCls} truncate`}>{sub}</p>}
           </div>
           <IconButton label="Close" onClick={onClose} className="ml-auto">
-            <Icon.X className="h-5 w-5" />
+            <X className="h-5 w-5" />
           </IconButton>
         </header>
         {children}
