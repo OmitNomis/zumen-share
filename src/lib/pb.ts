@@ -1,8 +1,19 @@
 import PocketBase, { type RecordModel } from "pocketbase";
+import { toast } from "sonner";
 
 // relative base: vite dev proxies /api to :8090, in prod pocketbase serves the app itself
 export const pb = new PocketBase("/");
 pb.autoCancellation(false);
+
+// centralizes 401 handling so every scattered catch block doesn't need to check for it itself:
+// clearing the authStore here flips RequireAuth's onChange subscription, redirecting to /login.
+pb.afterSend = (response, data) => {
+  if (response.status === 401 && pb.authStore.isValid) {
+    pb.authStore.clear();
+    toast.error("Session expired — please sign in again.");
+  }
+  return data;
+};
 
 export type Zumen = RecordModel & {
   name: string;
@@ -25,6 +36,19 @@ export type User = RecordModel & {
 };
 
 export const isAdmin = () => pb.authStore.record?.role === "admin";
+
+// mirrors the "zumen.file" field constraints in pb_migrations/1782864000_init.js exactly —
+// single source of truth for client-side validation before any upload request is sent.
+export const MAX_FILE_BYTES = 104_857_600;
+export const ACCEPTED_MIME = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/tiff",
+  "application/pdf",
+];
 
 // default display name for an upload = filename without its extension
 export const baseName = (filename: string) => filename.replace(/\.[^./\\]+$/, "");
