@@ -1,51 +1,41 @@
 import { useRef, useState } from "react";
-import { pb, isPdf, isAdmin, baseName, type Zumen } from "./lib/pb";
-import { BTN, IconButton, Spinner } from "./ui";
-import * as Icon from "./icons";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { pb, isPdf, isAdmin, type Zumen } from "../lib/pb";
+import { useZumenUpload } from "../hooks/use-zumen-upload";
+import { BTN, IconButton, Spinner } from "../ui";
+import { Logo } from "./logo";
+import {
+  ChevronRight,
+  FileText,
+  Image as ImageIcon,
+  List,
+  LogOut,
+  Search,
+  Upload,
+  Users,
+  X,
+} from "lucide-react";
 
 export type OyaNode = { oya: Zumen; ko: Zumen[] };
 
 type Props = {
   tree: OyaNode[];
-  openId: string | null;
   open: boolean; // drawer visible on small screens
   onClose: () => void;
-  onOpen: (id: string) => void;
-  onHome: () => void;
   onReload: () => void;
-  onLogs: () => void;
-  onAdmin: () => void;
 };
 
 const Glyph = ({ z, className }: { z: Zumen; className?: string }) =>
-  isPdf(z) ? <Icon.Pdf className={className} /> : <Icon.Image className={className} />;
+  isPdf(z) ? <FileText className={className} /> : <ImageIcon className={className} />;
 
-export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, onReload, onLogs, onAdmin }: Props) {
+export function Sidebar({ tree, open, onClose, onReload }: Props) {
+  const { id: openId } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState("");
   const [meow, setMeow] = useState(false);
   const taps = useRef(0);
-
-  async function upload(files: FileList | null) {
-    if (!files?.length) return;
-    const arr = [...files];
-    try {
-      for (let i = 0; i < arr.length; i++) {
-        setBusy(`Uploading ${i + 1}/${arr.length}…`);
-        const fd = new FormData();
-        fd.set("name", baseName(arr[i].name)); // default name = filename without extension
-        fd.set("file", arr[i]);
-        fd.set("uploaded_by", pb.authStore.record!.id);
-        await pb.collection("zumen").create(fd); // no oya / no source => a new oya
-      }
-    } catch (e) {
-      alert(`Upload failed: ${e}`);
-    } finally {
-      setBusy("");
-      onReload();
-    }
-  }
+  const { upload, busy } = useZumenUpload(undefined, onReload);
 
   function logoTap() {
     taps.current++;
@@ -53,7 +43,8 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
       setMeow(true);
       setTimeout(() => setMeow(false), 1600);
     }
-    onHome();
+    navigate("/");
+    onClose();
   }
 
   const ql = q.trim().toLowerCase();
@@ -88,7 +79,7 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
       <div className="relative flex h-16 items-center border-b border-ink-800/70 pr-2">
         <button onClick={logoTap} className="flex h-full flex-1 items-center gap-3 px-4 transition hover:bg-white/5">
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-print-600 text-white shadow-lg shadow-print-900/50 ring-1 ring-white/20">
-            <Icon.Logo className="h-5 w-5" />
+            <Logo className="h-5 w-5" />
           </div>
           <div className="min-w-0 text-left">
             <div className="truncate font-bold leading-tight text-white">Zumen Share</div>
@@ -96,7 +87,7 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
           </div>
         </button>
         <IconButton dark label="Close menu" onClick={onClose} className="lg:hidden">
-          <Icon.X className="h-5 w-5" />
+          <X className="h-5 w-5" />
         </IconButton>
         {meow && (
           <span className="absolute left-16 top-14 z-10 animate-bounce rounded-full bg-white px-2.5 py-1 text-xs text-ink-900 shadow-lg">
@@ -107,7 +98,7 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
 
       <div className="flex flex-col gap-2 p-3">
         <div className="relative">
-          <Icon.Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -116,14 +107,14 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
           />
         </div>
         <label className={`${BTN.primary} w-full ${busy ? "pointer-events-none opacity-70" : "cursor-pointer"}`}>
-          {busy ? <Spinner /> : <Icon.Upload className="h-4 w-4" />}
-          {busy || "Upload blueprint"}
+          {busy ? <Spinner /> : <Upload className="h-4 w-4" />}
+          {busy ? "Uploading…" : "Upload blueprint"}
           <input
             type="file"
             multiple
             accept="image/*,.pdf"
             className="hidden"
-            disabled={!!busy}
+            disabled={busy}
             onChange={(e) => upload(e.target.files)}
           />
         </label>
@@ -157,10 +148,11 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
                   tabIndex={hasKo ? 0 : -1}
                   aria-label={isOpen ? "Collapse parts" : "Expand parts"}
                 >
-                  <Icon.Chevron className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                  <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`} />
                 </button>
-                <button
-                  onClick={() => onOpen(oya.id)}
+                <Link
+                  to={`/z/${oya.id}`}
+                  onClick={onClose}
                   title={oya.name}
                   className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-2 text-sm"
                 >
@@ -175,15 +167,16 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
                       {ko.length}
                     </span>
                   )}
-                </button>
+                </Link>
               </div>
 
               {isOpen && hasKo && (
                 <div className="ml-[1.35rem] mt-0.5 flex flex-col border-l border-ink-800 pl-2.5">
                   {ko.map((k) => (
-                    <button
+                    <Link
                       key={k.id}
-                      onClick={() => onOpen(k.id)}
+                      to={`/z/${k.id}`}
+                      onClick={onClose}
                       title={k.name}
                       className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm transition ${
                         openId === k.id
@@ -193,7 +186,7 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
                     >
                       <Glyph z={k} className="h-3.5 w-3.5 shrink-0 opacity-60" />
                       <span className="truncate text-left">{k.name}</span>
-                    </button>
+                    </Link>
                   ))}
                 </div>
               )}
@@ -204,13 +197,13 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
 
       <div className="flex flex-col gap-1 border-t border-ink-800 p-3">
         {isAdmin() && (
-          <button onClick={onAdmin} className={footBtn}>
-            <Icon.Users className="h-4 w-4" /> Accounts
-          </button>
+          <Link to="/admin" onClick={onClose} className={footBtn}>
+            <Users className="h-4 w-4" /> Accounts
+          </Link>
         )}
-        <button onClick={onLogs} className={footBtn}>
-          <Icon.List className="h-4 w-4" /> Audit log
-        </button>
+        <Link to="/logs" onClick={onClose} className={footBtn}>
+          <List className="h-4 w-4" /> Audit log
+        </Link>
         <div className="mt-1 flex items-center gap-2.5 rounded-md border border-ink-800 bg-ink-900/60 p-2">
           <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-ink-700 font-mono text-xs font-semibold uppercase text-white ring-1 ring-ink-600">
             {(me?.name || me?.email)?.[0] ?? "?"}
@@ -222,7 +215,7 @@ export default function Sidebar({ tree, openId, open, onClose, onOpen, onHome, o
             </div>
           </div>
           <IconButton dark label="Log out" onClick={() => pb.authStore.clear()} className="h-9 w-9">
-            <Icon.LogOut className="h-4 w-4" />
+            <LogOut className="h-4 w-4" />
           </IconButton>
         </div>
       </div>

@@ -17,7 +17,7 @@ const CATS = ["🐱", "🐈", "😺", "😸", "🐈‍⬛", "😻"];
 
 type Cat = { emoji: string; left: number; size: number; dur: number; delay: number };
 
-export default function CatEasterEgg() {
+export function CatEasterEgg() {
   const [cats, setCats] = useState<Cat[] | null>(null);
 
   useEffect(() => {

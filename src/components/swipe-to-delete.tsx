@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
-import * as Icon from "./icons";
+import { Trash2 } from "lucide-react";
 
 const W = 84; // px of red revealed on a full swipe
 
 // Swipe a row left to reveal a Delete button (touch-friendly). Vertical scrolling
 // stays native via touch-action: pan-y; we only take over on a horizontal drag.
-export default function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children: React.ReactNode }) {
+export function SwipeToDelete({ onDelete, children }: { onDelete: () => void; children: React.ReactNode }) {
   const [dx, setDx] = useState(0);
   const [open, setOpen] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -44,7 +44,7 @@ export default function SwipeToDelete({ onDelete, children }: { onDelete: () => 
         className="absolute inset-y-0 right-0 flex items-center justify-center bg-verm-500 text-white active:bg-verm-600"
         style={{ width: W }}
       >
-        <Icon.Trash className="w-5 h-5" />
+        <Trash2 className="w-5 h-5" />
       </button>
       <div
         style={{ transform: `translateX(${dx}px)`, transition: drag ? "none" : "transform .2s ease", touchAction: "pan-y" }}

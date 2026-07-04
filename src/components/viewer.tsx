@@ -1,12 +1,41 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, Outlet } from "react-router-dom";
+import { toast } from "sonner";
 import * as pdfjs from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { pb, fileUrl, isPdf, isTiff, baseName, type Zumen } from "./lib/pb";
-import { tiffToCanvas } from "./lib/preview"; // also configures the pdf.js worker
-import Thumb from "./Thumb";
-import SwipeToDelete from "./SwipeToDelete";
-import { BTN, Button, IconButton, Modal, Spinner, Stamp } from "./ui";
-import * as Icon from "./icons";
+import { pb, fileUrl, isPdf, isTiff, type Zumen } from "../lib/pb";
+import { tiffToCanvas } from "../lib/preview"; // also configures the pdf.js worker
+import { Thumb } from "./thumb";
+import { SwipeToDelete } from "./swipe-to-delete";
+import { useConfirm } from "../hooks/use-confirm";
+import { useZumenUpload } from "../hooks/use-zumen-upload";
+import { useEscapeKey } from "../hooks/use-escape-key";
+import { Button, IconButton, Spinner, Stamp } from "../ui";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  Eraser,
+  Menu,
+  Move,
+  Pen,
+  Plus,
+  Printer,
+  Trash2,
+  Undo2,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+
+// shared with the nested "attach" route (src/components/attach-part.tsx) via useOutletContext()
+export type AttachContext = {
+  rootId: string;
+  token: string;
+  onUpload: (files: FileList | null) => void;
+  onAttach: (id: string) => void;
+};
 
 type Stroke = { color: string; width: number; points: { x: number; y: number }[] };
 const PRESETS = ["#d3381c", "#2750bb", "#16a34a", "#eab308", "#111827"];
@@ -19,7 +48,7 @@ type Props = {
   onMenu: () => void; // open the left sidebar drawer (small screens)
 };
 
-export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
+export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
   const [subject, setSubject] = useState<Zumen | null>(null); // the drawing being viewed (oya or ko)
   const [root, setRoot] = useState<Zumen | null>(null); // its oya (== subject when subject is an oya)
   const [copies, setCopies] = useState<Zumen[]>([]); // markup snapshots of subject
@@ -35,11 +64,13 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
   const [busy, setBusy] = useState("");
   const [copiesOpen, setCopiesOpen] = useState(false); // right drawer on small screens
   const [editingName, setEditingName] = useState(false);
-  const [attachOpen, setAttachOpen] = useState(false);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const drawRef = useRef<HTMLCanvasElement>(null);
   const current = useRef<Stroke | null>(null);
   const pdfCache = useRef<{ id: string; pdf: PDFDocumentProxy } | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const { upload: uploadKo } = useZumenUpload(root?.id, onReload);
+  useEscapeKey(() => setCopiesOpen(false), copiesOpen);
 
   const active = subject && (activeId === subject.id ? subject : copies.find((c) => c.id === activeId));
 
@@ -62,7 +93,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
       setActiveId(subj.id);
       setPage(1);
       await loadCopies(subj.id);
-    })().catch((e) => alert(e));
+    })().catch((e) => toast.error(String(e)));
   }, [id]);
 
   // render the active file onto the base canvas
@@ -114,20 +145,11 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
       draw.height = base.height;
       setStrokes([]);
       current.current = null;
-    })().catch((e) => !dead && alert(e));
+    })().catch((e) => !dead && toast.error(String(e)));
     return () => {
       dead = true;
     };
   }, [active?.id, active?.file, page]);
-
-  // full redraw of the overlay whenever strokes change (undo / clear / stroke end)
-  useEffect(() => {
-    const draw = drawRef.current;
-    if (!draw) return;
-    const ctx = draw.getContext("2d")!;
-    ctx.clearRect(0, 0, draw.width, draw.height);
-    for (const s of strokes) paintStroke(ctx, s);
-  }, [strokes]);
 
   function paintStroke(ctx: CanvasRenderingContext2D, s: Stroke) {
     ctx.strokeStyle = s.color;
@@ -146,6 +168,15 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
     for (const p of s.points.slice(1)) ctx.lineTo(p.x, p.y);
     ctx.stroke();
   }
+
+  // full redraw of the overlay whenever strokes change (undo / clear / stroke end)
+  useEffect(() => {
+    const draw = drawRef.current;
+    if (!draw) return;
+    const ctx = draw.getContext("2d")!;
+    ctx.clearRect(0, 0, draw.width, draw.height);
+    for (const s of strokes) paintStroke(ctx, s);
+  }, [strokes]);
 
   function pos(e: React.PointerEvent) {
     const c = drawRef.current!;
@@ -184,7 +215,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
     setStrokes((prev) => [...prev, s]);
   }
 
-  const confirmDiscard = () => !strokes.length || confirm("Discard unsaved marks?");
+  const confirmDiscard = () => (!strokes.length ? Promise.resolve(true) : confirm("Discard unsaved marks?"));
 
   // base sheet + overlay flattened onto one white canvas (used by save + print)
   function flatten(): HTMLCanvasElement {
@@ -228,7 +259,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
         setPage(1);
       }
     } catch (e) {
-      alert(`Save failed: ${e}`);
+      toast.error(`Save failed: ${e}`);
     } finally {
       setBusy("");
     }
@@ -238,7 +269,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
     if (!subject || !baseRef.current) return;
     const data = flatten().toDataURL("image/png");
     const w = window.open("", "_blank");
-    if (!w) return alert("Allow pop-ups to print.");
+    if (!w) return toast.error("Allow pop-ups to print.");
     w.document.write(
       `<!doctype html><title>${subject.name}</title>` +
         `<style>@page{margin:10mm}html,body{margin:0}img{display:block;width:100%}</style>` +
@@ -266,42 +297,27 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
       if (root && subject.id === root.id) setRoot({ ...root, name });
       onReload(); // sidebar picks up the new name
     } catch (e) {
-      alert(`Rename failed: ${e}`);
+      toast.error(`Rename failed: ${e}`);
     }
   }
 
-  // upload new file(s) as real parts (ko) of the blueprint
+  // upload new file(s) as real parts (ko) of the blueprint; onReload (new part in the
+  // sidebar tree) fires from useZumenUpload itself once the batch settles
   async function addKo(files: FileList | null) {
-    if (!files?.length || !root) return;
     setBusy("Attaching…");
-    setAttachOpen(false);
-    try {
-      for (const f of [...files]) {
-        const fd = new FormData();
-        fd.set("name", baseName(f.name));
-        fd.set("file", f);
-        fd.set("oya", root.id);
-        fd.set("uploaded_by", pb.authStore.record!.id);
-        await pb.collection("zumen").create(fd);
-      }
-      onReload(); // new part appears in the sidebar tree
-    } catch (e) {
-      alert(`Attach failed: ${e}`);
-    } finally {
-      setBusy("");
-    }
+    await uploadKo(files);
+    setBusy("");
   }
 
   // re-home an existing blueprint as a part (ko) of this one — it stops being an oya
   async function attachExisting(oyaId: string) {
     if (!root) return;
     setBusy("Attaching…");
-    setAttachOpen(false);
     try {
       await pb.collection("zumen").update(oyaId, { oya: root.id });
       onReload();
     } catch (e) {
-      alert(`Attach failed: ${e}`);
+      toast.error(`Attach failed: ${e}`);
     } finally {
       setBusy("");
     }
@@ -313,30 +329,30 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
     const msg = isOya
       ? `Delete "${subject.name}" and all its parts and copies?`
       : `Delete part "${subject.name}" and its copies?`;
-    if (!confirm(msg)) return;
+    if (!(await confirm(msg, { danger: true }))) return;
     try {
       await pb.collection("zumen").delete(subject.id);
       onReload();
       if (isOya) onHome();
       else onOpen(root.id);
     } catch (e) {
-      alert(`Delete failed: ${e}`);
+      toast.error(`Delete failed: ${e}`);
     }
   }
 
   async function delCopy(cid: string) {
-    if (!subject || !confirm("Delete this copy?")) return;
+    if (!subject || !(await confirm("Delete this copy?", { danger: true }))) return;
     try {
       await pb.collection("zumen").delete(cid);
       await loadCopies(subject.id);
       if (activeId === cid) setActiveId(subject.id);
     } catch (e) {
-      alert(`Delete failed: ${e}`);
+      toast.error(`Delete failed: ${e}`);
     }
   }
 
-  function view(zid: string) {
-    if (zid === activeId || !confirmDiscard()) return;
+  async function view(zid: string) {
+    if (zid === activeId || !(await confirmDiscard())) return;
     setActiveId(zid);
     setPage(1);
     setCopiesOpen(false);
@@ -367,19 +383,19 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
         {/* title bar */}
         <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-paper-300 bg-paper-50 px-2 sm:gap-2 sm:px-4">
           <IconButton label="Menu" onClick={onMenu} className="lg:hidden">
-            <Icon.Menu className="h-5 w-5" />
+            <Menu className="h-5 w-5" />
           </IconButton>
           <div className="flex min-w-0 items-center gap-1.5 text-sm">
             {subject.id !== root.id && (
               <>
                 <button
-                  onClick={() => confirmDiscard() && onOpen(root.id)}
+                  onClick={async () => (await confirmDiscard()) && onOpen(root.id)}
                   className="hidden max-w-48 truncate text-ink-500 transition hover:text-print-600 sm:block"
                   title={root.name}
                 >
                   {root.name}
                 </button>
-                <Icon.Chevron className="hidden h-3.5 w-3.5 shrink-0 text-paper-400 sm:block" />
+                <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-paper-400 sm:block" />
               </>
             )}
             {editingName ? (
@@ -410,17 +426,19 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
 
           <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
             <IconButton label="Download" onClick={downloadSheet}>
-              <Icon.Download className="h-5 w-5" />
+              <Download className="h-5 w-5" />
             </IconButton>
             <IconButton label="Print" onClick={printSheet}>
-              <Icon.Printer className="h-5 w-5" />
+              <Printer className="h-5 w-5" />
             </IconButton>
-            <Button variant="outline" onClick={() => setAttachOpen(true)} disabled={!!busy} className="h-9 px-2.5 sm:px-3">
-              <Icon.Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">{busy || "Attach part"}</span>
+            <Button variant="outline" asChild className="h-9 px-2.5 sm:px-3">
+              <Link to="attach">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">{busy || "Attach part"}</span>
+              </Link>
             </Button>
             <Button variant="outline" onClick={() => setCopiesOpen(true)} className="h-9 px-2.5 xl:hidden" title="Copies">
-              <Icon.Copies className="h-4 w-4" />
+              <Copy className="h-4 w-4" />
               <span className="font-mono text-xs tabular-nums">{copies.length}</span>
             </Button>
             <IconButton
@@ -428,7 +446,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
               label={subject.id === root.id ? "Delete blueprint" : "Delete part"}
               onClick={delSubject}
             >
-              <Icon.Trash className="h-5 w-5" />
+              <Trash2 className="h-5 w-5" />
             </IconButton>
           </div>
         </header>
@@ -456,16 +474,16 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
             <div className="flex items-center gap-1.5 overflow-x-auto rounded-xl bg-paper-50/95 px-2 py-1.5 shadow-2xl shadow-black/50 ring-1 ring-ink-900/15 backdrop-blur sm:gap-2 sm:px-3 sm:py-2">
               <div className="flex shrink-0 items-center rounded-lg bg-paper-200/80 p-0.5">
                 <button onClick={() => setMode("pan")} className={seg(mode === "pan")} title="Pan / zoom">
-                  <Icon.Move className="h-5 w-5" />
+                  <Move className="h-5 w-5" />
                 </button>
                 <button onClick={() => setMode("pen")} className={seg(mode === "pen")} title="Draw">
-                  <Icon.Pen className="h-5 w-5" />
+                  <Pen className="h-5 w-5" />
                 </button>
               </div>
 
               <div className="h-6 w-px shrink-0 bg-paper-300" />
               <button onClick={() => zoomBy(0.8)} className={tbtn} title="Zoom out">
-                <Icon.ZoomOut className="h-5 w-5" />
+                <ZoomOut className="h-5 w-5" />
               </button>
               <button
                 onClick={() => setZoom(1)}
@@ -475,7 +493,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
                 {Math.round(zoom * 100)}%
               </button>
               <button onClick={() => zoomBy(1.25)} className={tbtn} title="Zoom in">
-                <Icon.ZoomIn className="h-5 w-5" />
+                <ZoomIn className="h-5 w-5" />
               </button>
 
               {mode === "pen" && (
@@ -497,7 +515,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
                       className="relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full ring-1 ring-paper-300"
                       title="Custom color"
                     >
-                      <Icon.Pen className="h-3.5 w-3.5 text-ink-400" />
+                      <Pen className="h-3.5 w-3.5 text-ink-400" />
                       <input
                         type="color"
                         value={color}
@@ -516,10 +534,10 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
                     title={`Pen width ${penWidth}px`}
                   />
                   <button onClick={() => setStrokes((s) => s.slice(0, -1))} className={tbtn} title="Undo">
-                    <Icon.Undo className="h-5 w-5" />
+                    <Undo2 className="h-5 w-5" />
                   </button>
                   <button onClick={() => setStrokes([])} className={tbtn} title="Clear marks">
-                    <Icon.Eraser className="h-5 w-5" />
+                    <Eraser className="h-5 w-5" />
                   </button>
                 </>
               )}
@@ -529,23 +547,23 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
                   <div className="h-6 w-px shrink-0 bg-paper-300" />
                   <div className="flex shrink-0 items-center gap-1">
                     <button
-                      onClick={() => confirmDiscard() && setPage((p) => Math.max(1, p - 1))}
+                      onClick={async () => (await confirmDiscard()) && setPage((p) => Math.max(1, p - 1))}
                       className={tbtn}
                       disabled={page <= 1}
                       title="Previous page"
                     >
-                      <Icon.Chevron className="h-4 w-4 rotate-180" />
+                      <ChevronLeft className="h-4 w-4" />
                     </button>
                     <span className="w-10 text-center font-mono text-xs tabular-nums text-ink-600">
                       {page}/{numPages}
                     </span>
                     <button
-                      onClick={() => confirmDiscard() && setPage((p) => Math.min(numPages, p + 1))}
+                      onClick={async () => (await confirmDiscard()) && setPage((p) => Math.min(numPages, p + 1))}
                       className={tbtn}
                       disabled={page >= numPages}
                       title="Next page"
                     >
-                      <Icon.Chevron className="h-4 w-4" />
+                      <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </>
@@ -573,7 +591,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
             <div className="font-mono text-[9px] uppercase tracking-widest text-ink-400">{copies.length} saved</div>
           </div>
           <IconButton label="Close copies" onClick={() => setCopiesOpen(false)} className="h-8 w-8 xl:hidden">
-            <Icon.X className="h-4 w-4" />
+            <X className="h-4 w-4" />
           </IconButton>
         </header>
 
@@ -604,7 +622,7 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
         <div className="flex flex-col gap-2 border-t border-paper-200 bg-white p-3">
           {viewingCopy && (
             <Button onClick={() => save(true)} disabled={!!busy} className="w-full">
-              {busy ? <Spinner /> : <Icon.Pen className="h-4 w-4" />}
+              {busy ? <Spinner /> : <Pen className="h-4 w-4" />}
               {busy || "Save"}
             </Button>
           )}
@@ -614,87 +632,15 @@ export default function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) 
             disabled={!!busy}
             className="w-full"
           >
-            {busy && !viewingCopy ? <Spinner /> : <Icon.Copies className="h-4 w-4" />}
+            {busy && !viewingCopy ? <Spinner /> : <Copy className="h-4 w-4" />}
             {viewingCopy ? "Save as new copy" : busy || "Save marked-up copy"}
           </Button>
         </div>
       </aside>
 
-      {attachOpen && (
-        <AttachPart
-          rootId={root.id}
-          token={token}
-          onUpload={addKo}
-          onAttach={attachExisting}
-          onClose={() => setAttachOpen(false)}
-        />
-      )}
+      <Outlet context={{ rootId: root.id, token, onUpload: addKo, onAttach: attachExisting } satisfies AttachContext} />
+      {confirmDialog}
     </div>
-  );
-}
-
-// Attach a part: either upload new file(s) or pick an already-uploaded blueprint
-// (which gets re-homed as a part of the current one).
-function AttachPart({
-  rootId,
-  token,
-  onUpload,
-  onAttach,
-  onClose,
-}: {
-  rootId: string;
-  token: string;
-  onUpload: (files: FileList | null) => void;
-  onAttach: (id: string) => void;
-  onClose: () => void;
-}) {
-  const [candidates, setCandidates] = useState<Zumen[]>([]);
-
-  useEffect(() => {
-    pb.collection("zumen")
-      .getFullList<Zumen>({ filter: "source = ''", sort: "-created" })
-      .then((items) => {
-        // candidates = top-level oya, excluding this one and any that already have parts
-        // (the tree is only two levels deep, so moving a parent would orphan its parts)
-        const parents = new Set(items.filter((z) => z.oya).map((z) => z.oya));
-        setCandidates(items.filter((z) => !z.oya && z.id !== rootId && !parents.has(z.id)));
-      })
-      .catch(console.error);
-  }, [rootId]);
-
-  return (
-    <Modal title="Attach a part" kanji="部" sub="add a ko under this sheet" onClose={onClose}>
-      <div className="border-b border-paper-200 bg-white p-4">
-        <label className={`${BTN.primary} w-full cursor-pointer`}>
-          <Icon.Upload className="h-4 w-4" />
-          Upload new file(s)
-          <input type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => onUpload(e.target.files)} />
-        </label>
-      </div>
-
-      <div className="px-5 pb-2 pt-4 font-mono text-[10px] font-semibold uppercase tracking-widest text-ink-400">
-        Or re-home an existing blueprint
-      </div>
-      <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 overflow-auto p-4 pt-0">
-        {candidates.map((z) => (
-          <button
-            key={z.id}
-            onClick={() => onAttach(z.id)}
-            className="overflow-hidden rounded-lg border border-paper-300 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-print-400 hover:shadow-md"
-          >
-            <div className="grid aspect-4/3 place-items-center overflow-hidden border-b border-paper-200 bg-paper-100">
-              <Thumb z={z} token={token} width={280} />
-            </div>
-            <div className="truncate p-2 text-sm text-ink-800" title={z.name}>
-              {z.name}
-            </div>
-          </button>
-        ))}
-        {candidates.length === 0 && (
-          <p className="col-span-full py-8 text-center text-sm text-ink-400">No standalone blueprints to attach.</p>
-        )}
-      </div>
-    </Modal>
   );
 }
 
@@ -741,7 +687,7 @@ function ThumbRow({
           title="Delete copy"
           className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-white/90 text-ink-300 opacity-0 shadow-sm transition hover:text-verm-600 group-hover:opacity-100"
         >
-          <Icon.Trash className="h-4 w-4" />
+          <Trash2 className="h-4 w-4" />
         </button>
       )}
     </div>
