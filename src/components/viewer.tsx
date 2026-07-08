@@ -34,7 +34,7 @@ export type AttachContext = {
   rootId: string;
   token: string;
   onUpload: (files: FileList | null) => void;
-  onAttach: (id: string) => void;
+  onAttach: (ids: string[]) => void;
 };
 
 type Stroke = { color: string; width: number; points: { x: number; y: number }[] };
@@ -309,12 +309,12 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
     setBusy("");
   }
 
-  // re-home an existing blueprint as a part (ko) of this one — it stops being an oya
-  async function attachExisting(oyaId: string) {
-    if (!root) return;
+  // re-home existing blueprints as parts (ko) of this one — each stops being an oya
+  async function attachExisting(oyaIds: string[]) {
+    if (!root || !oyaIds.length) return;
     setBusy("Attaching…");
     try {
-      await pb.collection("zumen").update(oyaId, { oya: root.id });
+      for (const oid of oyaIds) await pb.collection("zumen").update(oid, { oya: root.id });
       onReload();
     } catch (e) {
       toast.error(`Attach failed: ${e}`);

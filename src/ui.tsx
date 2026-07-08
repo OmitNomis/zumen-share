@@ -1,12 +1,9 @@
 /* eslint-disable react-refresh/only-export-components -- class-string constants (BTN, microCls…) live beside the components that use them */
-import { X } from "lucide-react";
-import { IconButton } from "./components/ui/icon-button";
 
 /* Button/IconButton/Spinner/Stamp live in src/components/ui/* (shadcn-based) and are
-   re-exported here so existing call sites don't need two import paths. Modal/Field/
-   SelectField/BTN/microCls are small bespoke helpers with no shadcn equivalent, kept
-   here: Modal backs AttachPart's centered overlay, Field/SelectField back Login/Admin's
-   title-block-style labeled inputs. */
+   re-exported here so existing call sites don't need two import paths. Field/SelectField/
+   BTN/microCls are small bespoke helpers with no shadcn equivalent, kept here: Field/
+   SelectField back Login/Admin's title-block-style labeled inputs. */
 export { Button } from "./components/ui/button";
 export { IconButton } from "./components/ui/icon-button";
 export { Spinner } from "./components/ui/spinner";
@@ -52,52 +49,5 @@ export function SelectField({
         {children}
       </select>
     </label>
-  );
-}
-
-/* modal shell with a title-block header: kanji seal + title + mono sublabel.
-   Used by AttachPart, rendered at the nested /z/:id/attach route as an overlay
-   over the still-mounted Viewer canvas. */
-export function Modal({
-  title,
-  kanji,
-  sub,
-  width = "max-w-2xl",
-  onClose,
-  children,
-}: {
-  title: string;
-  kanji?: string;
-  sub?: string;
-  width?: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className="animate-fade fixed inset-0 z-50 grid place-items-center bg-ink-950/60 p-4 backdrop-blur-[2px]"
-      onClick={onClose}
-    >
-      <div
-        className={`animate-rise flex max-h-[85vh] w-full ${width} flex-col overflow-hidden rounded-xl bg-paper-50 shadow-2xl shadow-black/40 ring-1 ring-ink-900/10`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-center gap-3 border-b border-paper-200 bg-white px-5 py-3.5">
-          {kanji && (
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-print-200 bg-print-50 text-base font-semibold text-print-700 select-none">
-              {kanji}
-            </span>
-          )}
-          <div className="min-w-0">
-            <h2 className="truncate font-bold leading-tight text-ink-900">{title}</h2>
-            {sub && <p className={`${microCls} truncate`}>{sub}</p>}
-          </div>
-          <IconButton label="Close" onClick={onClose} className="ml-auto">
-            <X className="h-5 w-5" />
-          </IconButton>
-        </header>
-        {children}
-      </div>
-    </div>
   );
 }

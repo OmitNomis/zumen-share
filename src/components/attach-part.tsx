@@ -1,19 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { pb, type Zumen } from "../lib/pb";
 import { Thumb } from "./thumb";
 import { useFileDrop } from "../hooks/use-file-drop";
-import { BTN, Modal } from "../ui";
-import { Upload } from "lucide-react";
+import { useEscapeKey } from "../hooks/use-escape-key";
+import { Button, IconButton, microCls } from "../ui";
+import { Input } from "./ui/input";
+import { ArrowLeft, Check, Plus, Search, Upload } from "lucide-react";
 import type { AttachContext } from "./viewer";
 
-// Nested route rendered at /z/:id/attach (inside Viewer's own <Outlet>): either upload
-// new file(s) or pick an already-uploaded blueprint (which gets re-homed as a part of the current one).
+// Full-screen route rendered at /z/:id/attach (inside Viewer's own <Outlet>): either upload
+// new file(s) — drop anywhere on the screen — or pick one or more already-uploaded blueprints,
+// which get re-homed as parts of the current one. Covers the still-mounted Viewer underneath.
 export function AttachPart() {
   const { rootId, token, onUpload, onAttach } = useOutletContext<AttachContext>();
   const navigate = useNavigate();
   const close = () => navigate("..");
+  useEscapeKey(close, true);
   const [candidates, setCandidates] = useState<Zumen[]>([]);
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     pb.collection("zumen")
@@ -27,52 +33,140 @@ export function AttachPart() {
       .catch(console.error);
   }, [rootId]);
 
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? candidates.filter((z) => z.name.toLowerCase().includes(q)) : candidates;
+  }, [candidates, query]);
+
   function upload(files: FileList | null) {
     onUpload(files);
     close();
   }
 
-  function attach(id: string) {
-    onAttach(id);
+  function toggle(id: string) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function attach() {
+    if (!picked.size) return;
+    onAttach([...picked]);
     close();
   }
 
   const { isOver, dropProps } = useFileDrop(upload);
 
   return (
-    <Modal title="Attach a part" kanji="部" sub="add a ko under this sheet" onClose={close}>
-      <div className="border-b border-paper-200 bg-white p-4" {...dropProps}>
-        <label
-          className={`${BTN.primary} w-full cursor-pointer ${isOver ? "ring-2 ring-print-300 ring-offset-2" : ""}`}
-        >
-          <Upload className="h-4 w-4" />
-          {isOver ? "Drop to upload" : "Upload new file(s)"}
-          <input type="file" multiple accept="image/*,.pdf" className="hidden" onChange={(e) => upload(e.target.files)} />
-        </label>
+    <div className="animate-fade grid-paper fixed inset-0 z-50 flex flex-col bg-paper-100" {...dropProps}>
+      {isOver && (
+        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center border-4 border-dashed border-print-500 bg-print-500/10 backdrop-blur-[1px]">
+          <div className="flex items-center gap-2.5 rounded-lg bg-white px-6 py-4 text-lg font-semibold text-print-700 shadow-2xl">
+            <Upload className="h-5 w-5" /> Drop to upload
+          </div>
+        </div>
+      )}
+
+      <header className="flex shrink-0 items-center gap-3 border-b border-paper-300/70 bg-paper-100/85 px-4 py-4 backdrop-blur sm:px-8">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-print-200 bg-print-50 text-base font-semibold text-print-700 select-none">
+          部
+        </span>
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-bold leading-tight text-ink-900">Attach parts</h1>
+          <p className={`${microCls} truncate`}>add ko under this sheet</p>
+        </div>
+        <IconButton label="Back" onClick={close} className="ml-auto">
+          <ArrowLeft className="h-5 w-5" />
+        </IconButton>
+      </header>
+
+      <div className="flex-1 overflow-auto">
+        <section className="border-b border-paper-200 p-4 sm:p-6">
+          <Button
+            asChild
+            className={`w-full cursor-pointer ${isOver ? "ring-2 ring-print-300 ring-offset-2" : ""}`}
+          >
+            <label>
+              <Upload className="h-4 w-4" />
+              Upload new file(s)
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf"
+                className="hidden"
+                onChange={(e) => upload(e.target.files)}
+              />
+            </label>
+          </Button>
+          <p className="mt-2 text-center text-xs text-ink-400">or drag files anywhere onto this screen</p>
+        </section>
+
+        <section className="p-4 sm:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className={microCls}>Or re-home existing blueprints</div>
+            <div className="relative w-full sm:w-64">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-300" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search blueprints…"
+                className="h-9 pl-8"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+            {shown.map((z) => {
+              const on = picked.has(z.id);
+              return (
+                <button
+                  key={z.id}
+                  onClick={() => toggle(z.id)}
+                  aria-pressed={on}
+                  className={`relative overflow-hidden rounded-lg border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                    on ? "border-print-500 ring-2 ring-print-500" : "border-paper-300 hover:border-print-400"
+                  }`}
+                >
+                  {on && (
+                    <span className="absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-print-600 text-white shadow">
+                      <Check className="h-4 w-4" />
+                    </span>
+                  )}
+                  <div className="grid aspect-4/3 place-items-center overflow-hidden border-b border-paper-200 bg-paper-100">
+                    <Thumb z={z} token={token} width={280} />
+                  </div>
+                  <div className="truncate p-2 text-sm text-ink-800" title={z.name}>
+                    {z.name}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {shown.length === 0 && (
+            <p className="py-12 text-center text-sm text-ink-400">
+              {candidates.length === 0 ? "No standalone blueprints to attach." : "No blueprints match your search."}
+            </p>
+          )}
+        </section>
       </div>
 
-      <div className="px-5 pb-2 pt-4 font-mono text-[10px] font-semibold uppercase tracking-widest text-ink-400">
-        Or re-home an existing blueprint
-      </div>
-      <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 overflow-auto p-4 pt-0">
-        {candidates.map((z) => (
-          <button
-            key={z.id}
-            onClick={() => attach(z.id)}
-            className="overflow-hidden rounded-lg border border-paper-300 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-print-400 hover:shadow-md"
-          >
-            <div className="grid aspect-4/3 place-items-center overflow-hidden border-b border-paper-200 bg-paper-100">
-              <Thumb z={z} token={token} width={280} />
-            </div>
-            <div className="truncate p-2 text-sm text-ink-800" title={z.name}>
-              {z.name}
-            </div>
-          </button>
-        ))}
-        {candidates.length === 0 && (
-          <p className="col-span-full py-8 text-center text-sm text-ink-400">No standalone blueprints to attach.</p>
-        )}
-      </div>
-    </Modal>
+      {picked.size > 0 && (
+        <footer className="flex shrink-0 items-center gap-3 border-t border-paper-300 bg-paper-50 px-4 py-3 sm:px-6">
+          <span className="text-sm text-ink-600">
+            <span className="font-semibold text-ink-900">{picked.size}</span> selected
+          </span>
+          <Button variant="ghost" onClick={() => setPicked(new Set())} className="ml-auto">
+            Clear
+          </Button>
+          <Button onClick={attach}>
+            <Plus className="h-4 w-4" />
+            Attach {picked.size} part{picked.size > 1 ? "s" : ""}
+          </Button>
+        </footer>
+      )}
+    </div>
   );
 }
