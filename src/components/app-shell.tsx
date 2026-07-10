@@ -22,7 +22,9 @@ export function AppShell() {
   // one query for the whole navigable set (oya + ko, never copies), grouped client-side
   const loadTree = useCallback(async () => {
     if (!pb.authStore.isValid) return;
-    const items = await pb.collection("zumen").getFullList<Zumen>({ filter: "source = ''", sort: "-created" });
+    const items = await pb
+      .collection("zumen")
+      .getFullList<Zumen>({ filter: "source = ''", sort: "-created", expand: "uploaded_by" });
     setToken(await pb.files.getToken());
     const byOya = new Map<string, Zumen[]>();
     for (const z of items) {
@@ -52,7 +54,7 @@ export function AppShell() {
       {navOpen && (
         <div className="animate-fade fixed inset-0 z-30 bg-ink-950/60 backdrop-blur-[2px] lg:hidden" onClick={() => setNavOpen(false)} />
       )}
-      <Sidebar tree={tree} open={navOpen} onClose={() => setNavOpen(false)} onReload={loadTree} />
+      <Sidebar open={navOpen} onClose={() => setNavOpen(false)} onReload={loadTree} />
       <div className="min-w-0 flex-1">
         <RouteTransition context={context} />
       </div>
