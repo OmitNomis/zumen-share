@@ -1,20 +1,24 @@
 import { useEffect, useState } from "react";
-import { fileUrl, isPdf, isNativeImage, type Zumen } from "../lib/pb";
+import { fileUrl, thumbUrl, isPdf, isNativeImage, type Zumen } from "../lib/pb";
 import { pdfPageToCanvas, tiffToCanvas } from "../lib/preview";
 import { FileText, Image as ImageIcon } from "lucide-react";
 
-// id -> generated preview data URL (pdf/tiff only). Kept across mounts so grids/panels
-// don't re-decode as you navigate. ponytail: unbounded; fine for an office-sized library.
+// id -> generated preview data URL, for old pdf/tiff records with no stored thumb.
+// Kept across mounts so grids/panels don't re-decode as you navigate.
+// ponytail: unbounded; fine for an office-sized library.
 const cache = new Map<string, string>();
 
 // A raster preview for any zumen. Fills its (sized, overflow-hidden) parent.
+// Fast path: native images -> server thumbnail; pdf/tiff -> the thumb saved at upload.
+// Slow fallback (decode the whole file) only for pdf/tiff uploaded before thumbs existed.
 export function Thumb({ z, token, width = 400 }: { z: Zumen; token: string; width?: number }) {
   const native = isNativeImage(z);
-  const cached = !native ? cache.get(z.id) : undefined;
+  const needsDecode = !native && !z.thumb;
+  const cached = needsDecode ? cache.get(z.id) : undefined;
   const [decoded, setDecoded] = useState<string | null>(cached ?? null);
 
   useEffect(() => {
-    if (!token || native || cache.has(z.id)) return;
+    if (!token || !needsDecode || cache.has(z.id)) return;
     let dead = false;
     (async () => {
       const canvas = isPdf(z)
@@ -27,9 +31,15 @@ export function Thumb({ z, token, width = 400 }: { z: Zumen; token: string; widt
     return () => {
       dead = true;
     };
-  }, [z.id, z.file, token, native, width]);
+  }, [z.id, z.file, token, needsDecode, width]);
 
-  const src = native ? (token ? fileUrl(z, token, `${width}x${Math.round(width * 0.75)}`) : null) : (cached ?? decoded);
+  const src = !token
+    ? null
+    : native
+      ? fileUrl(z, token, `${width}x${Math.round(width * 0.75)}`)
+      : z.thumb
+        ? thumbUrl(z, token)
+        : (cached ?? decoded);
 
   if (!src) {
     const Glyph = isPdf(z) ? FileText : ImageIcon;

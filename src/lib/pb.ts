@@ -18,6 +18,7 @@ pb.afterSend = (response, data) => {
 export type Zumen = RecordModel & {
   name: string;
   file: string;
+  thumb: string; // small generated preview (pdf/tiff uploads). '' => none, decode/serve the file.
   oya: string; // parent oya id — set on real part drawings (ko). '' on an oya or a copy.
   source: string; // drawing this is a markup-copy of. Set on copies only. '' otherwise.
   uploaded_by: string;
@@ -64,3 +65,6 @@ export const isOya = (z: Zumen) => !z.oya && !z.source; // top-level blueprint
 export function fileUrl(z: Zumen, token: string, thumb?: string) {
   return pb.files.getURL(z, z.file, thumb ? { token, thumb } : { token });
 }
+
+// URL for the stored preview image (only present on pdf/tiff uploads; check z.thumb first)
+export const thumbUrl = (z: Zumen, token: string) => pb.files.getURL(z, z.thumb, { token });
