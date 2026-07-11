@@ -110,6 +110,10 @@ export function HomePage() {
   }, [tree, q, date, uploader, sort]);
 
   const parts = nodes.reduce((n, t) => n + t.ko.length, 0);
+  // "select all" acts on what's visible (i.e. current filters), computed at render so the
+  // handler closes over a plain array rather than the impure `nodes` memo (compiler-safe)
+  const visibleIds = nodes.map(({ oya }) => oya.id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
 
   return (
     <div className="relative grid-paper h-full overflow-auto" {...dropProps}>
@@ -255,6 +259,13 @@ export function HomePage() {
       {selecting && (
         <div className="fixed inset-x-0 bottom-0 z-30 flex flex-wrap items-center justify-center gap-3 border-t border-paper-300 bg-white/95 px-4 py-3 backdrop-blur">
           <span className={microCls}>{selected.size} selected</span>
+          <button
+            type="button"
+            className={BTN.ghost}
+            onClick={() => setSelected(allSelected ? new Set() : new Set(visibleIds))}
+          >
+            {allSelected ? "Clear all" : "Select all"}
+          </button>
           <button type="button" className={BTN.outline} disabled={!selected.size} onClick={bulkDownload}>
             <Download className="h-4 w-4" /> Download
           </button>
