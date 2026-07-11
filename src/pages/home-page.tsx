@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
+import { toast } from "sonner";
 import { Thumb } from "../components/thumb";
-import { IconButton, Stamp } from "../ui";
+import { BTN, IconButton, Stamp, microCls } from "../ui";
 import { useZumenUpload } from "../hooks/use-zumen-upload";
 import { useFileDrop } from "../hooks/use-file-drop";
-import { Menu, Search, Upload } from "lucide-react";
+import { useConfirm } from "../hooks/use-confirm";
+import { useEscapeKey } from "../hooks/use-escape-key";
+import { Check, CheckSquare, Download, Menu, Search, Trash2, Upload, X } from "lucide-react";
 import type { ShellContext } from "../components/app-shell";
-import type { Zumen } from "../lib/pb";
+import { pb, fileUrl, type Zumen } from "../lib/pb";
 
 const DAY = 86_400_000;
 const DATE_WINDOWS: Record<string, number> = { "7d": 7 * DAY, "30d": 30 * DAY };
@@ -26,6 +29,52 @@ export function HomePage() {
   const [date, setDate] = useState("all");
   const [uploader, setUploader] = useState("all");
   const [sort, setSort] = useState("new");
+
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const { confirm, dialog } = useConfirm();
+  const exitSelect = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+  useEscapeKey(exitSelect, selecting);
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+
+  // deleting an oya cascades to its parts & copies (DB rule) — same as the viewer's single delete
+  async function bulkDelete() {
+    const n = selected.size;
+    if (!(await confirm(`Delete ${n} blueprint${n > 1 ? "s" : ""} and all their parts and copies?`, { danger: true }))) return;
+    try {
+      await Promise.all([...selected].map((id) => pb.collection("zumen").delete(id)));
+      exitSelect();
+      reload();
+    } catch (e) {
+      toast.error(`Delete failed: ${e}`);
+    }
+  }
+
+  // one <a download> per file, staggered so the browser doesn't drop rapid-fire downloads.
+  // ponytail: sequential anchors (one "allow multiple downloads" consent) instead of a zip dep.
+  async function bulkDownload() {
+    for (const { oya } of tree) {
+      if (!selected.has(oya.id)) continue;
+      const dot = oya.file.lastIndexOf(".");
+      const ext = dot < 0 ? "" : oya.file.slice(dot);
+      const a = document.createElement("a");
+      a.href = fileUrl(oya, token) + "&download=1";
+      a.download = oya.name.endsWith(ext) ? oya.name : oya.name + ext;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
 
   const uploaders = useMemo(() => {
     const m = new Map<string, string>();
@@ -122,6 +171,11 @@ export function HomePage() {
             <option value="az">Name A–Z</option>
             <option value="za">Name Z–A</option>
           </select>
+          {!selecting && nodes.length > 0 && (
+            <button type="button" onClick={() => setSelecting(true)} className={BTN.outline}>
+              <CheckSquare className="h-4 w-4" /> Select
+            </button>
+          )}
         </div>
       </header>
 
@@ -138,34 +192,81 @@ export function HomePage() {
           <p className="text-sm text-ink-500">No blueprints match your filters.</p>
         </div>
       ) : (
-        <main className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 p-4 sm:p-8">
-          {nodes.map(({ oya, ko }) => (
-            <Link
-              key={oya.id}
-              to={`/z/${oya.id}`}
-              className="group flex flex-col overflow-hidden rounded-lg border border-paper-300 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:border-print-400 hover:shadow-xl hover:shadow-print-900/10"
-            >
-              <div className="p-2 pb-0">
-                <div className="grid aspect-4/3 place-items-center overflow-hidden rounded-sm border border-paper-200 bg-paper-100">
-                  <Thumb z={oya} token={token} width={400} />
+        <main
+          className={
+            "grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 p-4 sm:p-8" + (selecting ? " pb-24" : "")
+          }
+        >
+          {nodes.map(({ oya, ko }) => {
+            const sel = selected.has(oya.id);
+            const inner = (
+              <>
+                <div className="p-2 pb-0">
+                  <div className="grid aspect-4/3 place-items-center overflow-hidden rounded-sm border border-paper-200 bg-paper-100">
+                    <Thumb z={oya} token={token} width={400} />
+                  </div>
                 </div>
-              </div>
-              {/* title block, like the corner of a real drawing sheet */}
-              <div className="mt-2 border-t border-paper-200 px-3 py-2.5">
-                <div className="truncate text-sm font-semibold text-ink-900 group-hover:text-print-700" title={oya.name}>
-                  {oya.name}
+                {/* title block, like the corner of a real drawing sheet */}
+                <div className="mt-2 border-t border-paper-200 px-3 py-2.5">
+                  <div className="truncate text-sm font-semibold text-ink-900 group-hover:text-print-700" title={oya.name}>
+                    {oya.name}
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink-400">
+                      {new Date(oya.created).toLocaleDateString()}
+                    </span>
+                    {ko.length > 0 && <Stamp>{ko.length} part{ko.length > 1 ? "s" : ""}</Stamp>}
+                  </div>
                 </div>
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-ink-400">
-                    {new Date(oya.created).toLocaleDateString()}
+              </>
+            );
+            const base =
+              "group flex flex-col overflow-hidden rounded-lg border bg-white text-left shadow-sm transition";
+            if (selecting)
+              return (
+                <button
+                  key={oya.id}
+                  type="button"
+                  onClick={() => toggle(oya.id)}
+                  aria-pressed={sel}
+                  className={`${base} relative ${sel ? "border-print-500 ring-2 ring-print-500" : "border-paper-300 hover:border-print-400"}`}
+                >
+                  <span
+                    className={`absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-md border ${sel ? "border-print-500 bg-print-600 text-white" : "border-paper-300 bg-white/90"}`}
+                  >
+                    {sel && <Check className="h-4 w-4" />}
                   </span>
-                  {ko.length > 0 && <Stamp>{ko.length} part{ko.length > 1 ? "s" : ""}</Stamp>}
-                </div>
-              </div>
-            </Link>
-          ))}
+                  {inner}
+                </button>
+              );
+            return (
+              <Link
+                key={oya.id}
+                to={`/z/${oya.id}`}
+                className={`${base} border-paper-300 hover:-translate-y-1 hover:border-print-400 hover:shadow-xl hover:shadow-print-900/10`}
+              >
+                {inner}
+              </Link>
+            );
+          })}
         </main>
       )}
+
+      {selecting && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex flex-wrap items-center justify-center gap-3 border-t border-paper-300 bg-white/95 px-4 py-3 backdrop-blur">
+          <span className={microCls}>{selected.size} selected</span>
+          <button type="button" className={BTN.outline} disabled={!selected.size} onClick={bulkDownload}>
+            <Download className="h-4 w-4" /> Download
+          </button>
+          <button type="button" className={BTN.danger} disabled={!selected.size} onClick={bulkDelete}>
+            <Trash2 className="h-4 w-4" /> Delete
+          </button>
+          <button type="button" className={BTN.ghost} onClick={exitSelect}>
+            <X className="h-4 w-4" /> Cancel
+          </button>
+        </div>
+      )}
+      {dialog}
     </div>
   );
 }
