@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { pb, type Zumen } from "../lib/pb";
 import { Thumb } from "./thumb";
+import { useZumenPage } from "../hooks/use-zumen-page";
 import { useFileDrop } from "../hooks/use-file-drop";
 import { useEscapeKey } from "../hooks/use-escape-key";
-import { Button, IconButton, microCls } from "../ui";
+import { Button, IconButton, Spinner, microCls } from "../ui";
 import { Input } from "./ui/input";
 import { ArrowLeft, Check, Plus, Search, Upload } from "lucide-react";
 import type { AttachContext } from "./viewer";
@@ -17,26 +17,41 @@ export function AttachPart() {
   const navigate = useNavigate();
   const close = () => navigate("..");
   useEscapeKey(close, true);
-  const [candidates, setCandidates] = useState<Zumen[]>([]);
   const [query, setQuery] = useState("");
+  const [qDebounced, setQDebounced] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
+  // debounce search so typing doesn't fire a request per keystroke
   useEffect(() => {
-    pb.collection("zumen")
-      .getFullList<Zumen>({ filter: "source = ''", sort: "-created" })
-      .then((items) => {
-        // candidates = top-level oya, excluding this one and any that already have parts
-        // (the tree is only two levels deep, so moving a parent would orphan its parts)
-        const parents = new Set(items.filter((z) => z.oya).map((z) => z.oya));
-        setCandidates(items.filter((z) => !z.oya && z.id !== rootId && !parents.has(z.id)));
-      })
-      .catch(console.error);
-  }, [rootId]);
+    const t = setTimeout(() => setQDebounced(query), 250);
+    return () => clearTimeout(t);
+  }, [query]);
 
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? candidates.filter((z) => z.name.toLowerCase().includes(q)) : candidates;
-  }, [candidates, query]);
+  // same paginated oya + ko-count fetch as the home grid; candidates = the top-level oya it
+  // returns, minus this sheet and any that already have parts (a page can yield fewer than
+  // PER_PAGE candidates — the scroll sentinel just keeps pulling pages until it finds more).
+  const { nodes, loading, hasMore, loadMore } = useZumenPage(
+    { q: qDebounced, date: "all", uploader: "all", sort: "new" },
+    0,
+  );
+  const shown = useMemo(
+    () => nodes.filter((n) => n.oya.id !== rootId && n.ko.length === 0).map((n) => n.oya),
+    [nodes, rootId],
+  );
+
+  // infinite scroll: pull the next page when the sentinel scrolls into view
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const io = new IntersectionObserver((e) => e[0].isIntersecting && loadMore(), {
+      root: scrollRef.current,
+      rootMargin: "400px",
+    });
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [loadMore]);
 
   function upload(files: FileList | null) {
     onUpload(files);
@@ -83,7 +98,7 @@ export function AttachPart() {
         </IconButton>
       </header>
 
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollRef} className="flex-1 overflow-auto">
         <section className="border-b border-paper-200 p-4 sm:p-6">
           <Button
             asChild
@@ -145,10 +160,15 @@ export function AttachPart() {
               );
             })}
           </div>
-          {shown.length === 0 && (
+          {shown.length === 0 && !loading && !hasMore && (
             <p className="py-12 text-center text-sm text-ink-400">
-              {candidates.length === 0 ? "No standalone blueprints to attach." : "No blueprints match your search."}
+              {qDebounced.trim() ? "No blueprints match your search." : "No standalone blueprints to attach."}
             </p>
+          )}
+          {hasMore && (
+            <div ref={sentinelRef} className="grid place-items-center py-8">
+              {loading && <Spinner className="h-6 w-6 text-print-400" />}
+            </div>
           )}
         </section>
       </div>

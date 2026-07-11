@@ -1,18 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { toast } from "sonner";
 import { Thumb } from "../components/thumb";
-import { BTN, IconButton, Stamp, microCls } from "../ui";
+import { BTN, IconButton, Spinner, Stamp, microCls } from "../ui";
 import { useZumenUpload } from "../hooks/use-zumen-upload";
+import { useZumenPage } from "../hooks/use-zumen-page";
 import { useFileDrop } from "../hooks/use-file-drop";
 import { useConfirm } from "../hooks/use-confirm";
 import { useEscapeKey } from "../hooks/use-escape-key";
 import { Check, CheckSquare, Download, Menu, Search, Trash2, Upload, X } from "lucide-react";
 import type { ShellContext } from "../components/app-shell";
 import { pb, fileUrl, type Zumen } from "../lib/pb";
-
-const DAY = 86_400_000;
-const DATE_WINDOWS: Record<string, number> = { "7d": 7 * DAY, "30d": 30 * DAY };
 
 // names only resolve for accounts the viewer may see (admins: everyone; a user: themselves)
 const uploaderName = (o: Zumen) => o.expand?.uploaded_by?.name || "";
@@ -21,14 +19,27 @@ const selectCls =
   "rounded-md border border-paper-300 bg-white px-2.5 py-2 text-sm text-ink-700 transition focus:border-print-500";
 
 export function HomePage() {
-  const { tree, token, onMenu, reload } = useOutletContext<ShellContext>();
+  const { token, reloadKey, onMenu, reload } = useOutletContext<ShellContext>();
   const { upload } = useZumenUpload(undefined, reload);
   const { isOver, dropProps } = useFileDrop(upload);
 
   const [q, setQ] = useState("");
+  const [qDebounced, setQDebounced] = useState(""); // what actually drives the query
   const [date, setDate] = useState("all");
   const [uploader, setUploader] = useState("all");
   const [sort, setSort] = useState("new");
+
+  // debounce search so typing doesn't fire a request per keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  // server-paginated blueprint list; grows as you scroll (see the sentinel below)
+  const { nodes, total, loading, hasMore, loadMore } = useZumenPage(
+    { q: qDebounced, date, uploader, sort },
+    reloadKey,
+  );
 
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -62,7 +73,7 @@ export function HomePage() {
   // one <a download> per file, staggered so the browser doesn't drop rapid-fire downloads.
   // ponytail: sequential anchors (one "allow multiple downloads" consent) instead of a zip dep.
   async function bulkDownload() {
-    for (const { oya } of tree) {
+    for (const { oya } of nodes) {
       if (!selected.has(oya.id)) continue;
       const dot = oya.file.lastIndexOf(".");
       const ext = dot < 0 ? "" : oya.file.slice(dot);
@@ -76,47 +87,41 @@ export function HomePage() {
     }
   }
 
+  // built from loaded pages, so it grows as you scroll rather than listing every uploader up
+  // front. ponytail: a complete list would need a separate distinct-uploaders query — add it
+  // if the incremental dropdown proves annoying.
   const uploaders = useMemo(() => {
     const m = new Map<string, string>();
-    for (const { oya } of tree) {
+    for (const { oya } of nodes) {
       const name = uploaderName(oya);
       if (oya.uploaded_by && name) m.set(oya.uploaded_by, name);
     }
     return [...m].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [tree]);
+  }, [nodes]);
 
-  const nodes = useMemo(() => {
-    const ql = q.trim().toLowerCase();
-    // filters are time-relative, so reading the clock during render is intentional
-    // eslint-disable-next-line react-hooks/purity
-    const now = Date.now();
-    const dateOk = (created: string) => {
-      if (date === "all") return true;
-      if (date === "today") return new Date(created).toDateString() === new Date(now).toDateString();
-      return new Date(created).getTime() >= now - DATE_WINDOWS[date];
-    };
-    const out = tree.filter(({ oya, ko }) => {
-      if (ql && !oya.name.toLowerCase().includes(ql) && !ko.some((k) => k.name.toLowerCase().includes(ql))) return false;
-      if (uploader !== "all" && oya.uploaded_by !== uploader) return false;
-      return dateOk(oya.created);
-    });
-    out.sort((a, b) => {
-      if (sort === "az") return a.oya.name.localeCompare(b.oya.name);
-      if (sort === "za") return b.oya.name.localeCompare(a.oya.name);
-      const cmp = a.oya.created < b.oya.created ? -1 : 1;
-      return sort === "old" ? cmp : -cmp; // default: newest first
-    });
-    return out;
-  }, [tree, q, date, uploader, sort]);
-
+  const filtered = qDebounced.trim() !== "" || date !== "all" || uploader !== "all";
   const parts = nodes.reduce((n, t) => n + t.ko.length, 0);
   // "select all" acts on what's visible (i.e. current filters), computed at render so the
   // handler closes over a plain array rather than the impure `nodes` memo (compiler-safe)
   const visibleIds = nodes.map(({ oya }) => oya.id);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
 
+  // infinite scroll: load the next page when the sentinel scrolls into view
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const io = new IntersectionObserver((e) => e[0].isIntersecting && loadMore(), {
+      root: scrollRef.current,
+      rootMargin: "400px", // start fetching before the user hits the bottom
+    });
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [loadMore]);
+
   return (
-    <div className="relative grid-paper h-full overflow-auto" {...dropProps}>
+    <div ref={scrollRef} className="relative grid-paper h-full overflow-auto" {...dropProps}>
       {isOver && (
         <div className="pointer-events-none fixed inset-0 z-20 grid place-items-center border-4 border-dashed border-print-500 bg-print-500/10 backdrop-blur-[1px]">
           <div className="flex items-center gap-2.5 rounded-lg bg-white px-6 py-4 text-lg font-semibold text-print-700 shadow-2xl">
@@ -134,7 +139,7 @@ export function HomePage() {
             <span className="hidden select-none text-lg font-semibold text-print-300 sm:block">図面</span>
           </div>
           <p className="ml-auto text-right font-mono text-[10px] uppercase tracking-widest text-ink-400 sm:text-[11px]">
-            {nodes.length} sheets · {parts} parts
+            {total} sheets · {parts} parts loaded
           </p>
         </div>
 
@@ -144,7 +149,7 @@ export function HomePage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search oya & ko…"
+              placeholder="Search blueprints…"
               className="w-full rounded-md border border-paper-300 bg-white py-2 pl-9 pr-3 text-sm text-ink-900 placeholder:text-ink-400 transition focus:border-print-500"
             />
           </div>
@@ -183,19 +188,26 @@ export function HomePage() {
         </div>
       </header>
 
-      {tree.length === 0 ? (
+      {loading && nodes.length === 0 ? (
         <div className="grid place-items-center px-4 py-24">
-          <div className="w-full max-w-md rounded-lg border-2 border-dashed border-print-200 bg-white/60 px-8 py-14 text-center">
-            <div className="mb-4 animate-bounce text-6xl">😺</div>
-            <p className="font-semibold text-ink-800">No blueprints yet</p>
-            <p className="mt-1 text-sm text-ink-500">Drag a file here, or upload from the sidebar.</p>
-          </div>
+          <Spinner className="h-8 w-8 text-print-400" />
         </div>
       ) : nodes.length === 0 ? (
-        <div className="grid place-items-center px-4 py-24">
-          <p className="text-sm text-ink-500">No blueprints match your filters.</p>
-        </div>
+        filtered ? (
+          <div className="grid place-items-center px-4 py-24">
+            <p className="text-sm text-ink-500">No blueprints match your filters.</p>
+          </div>
+        ) : (
+          <div className="grid place-items-center px-4 py-24">
+            <div className="w-full max-w-md rounded-lg border-2 border-dashed border-print-200 bg-white/60 px-8 py-14 text-center">
+              <div className="mb-4 animate-bounce text-6xl">😺</div>
+              <p className="font-semibold text-ink-800">No blueprints yet</p>
+              <p className="mt-1 text-sm text-ink-500">Drag a file here, or upload from the sidebar.</p>
+            </div>
+          </div>
+        )
       ) : (
+        <>
         <main
           className={
             "grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5 p-4 sm:p-8" + (selecting ? " pb-24" : "")
@@ -254,6 +266,12 @@ export function HomePage() {
             );
           })}
         </main>
+        {hasMore && (
+          <div ref={sentinelRef} className="grid place-items-center py-8">
+            {loading && <Spinner className="h-6 w-6 text-print-400" />}
+          </div>
+        )}
+        </>
       )}
 
       {selecting && (
