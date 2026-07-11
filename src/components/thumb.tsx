@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
-import { fileUrl, thumbUrl, isPdf, isNativeImage, type Zumen } from "../lib/pb";
+import { fileUrl, isPdf, isNativeImage, type Zumen } from "../lib/pb";
 import { pdfPageToCanvas, tiffToCanvas } from "../lib/preview";
 import { FileText, Image as ImageIcon } from "lucide-react";
 
-// id -> generated preview data URL, for old pdf/tiff records with no stored thumb.
-// Kept across mounts so grids/panels don't re-decode as you navigate.
-// ponytail: unbounded; fine for an office-sized library.
+// id -> decoded pdf/tiff preview data URL. Kept across mounts so grids/panels
+// don't re-decode as you navigate. ponytail: unbounded; fine for an office-sized library.
 const cache = new Map<string, string>();
 
 // A raster preview for any zumen. Fills its (sized, overflow-hidden) parent.
-// Fast path: native images -> server thumbnail; pdf/tiff -> the thumb saved at upload.
-// Slow fallback (decode the whole file) only for pdf/tiff uploaded before thumbs existed.
+// Native images -> server thumbnail. PDF/TIFF -> decoded in-browser to a white-flattened
+// PNG data URL (pdfPageToCanvas/tiffToCanvas both render onto opaque white, so no
+// transparent-pixel-turns-black surprises), cached above.
 export function Thumb({ z, token, width = 400 }: { z: Zumen; token: string; width?: number }) {
   const native = isNativeImage(z);
-  const needsDecode = !native && !z.thumb;
+  const needsDecode = !native;
   const cached = needsDecode ? cache.get(z.id) : undefined;
   const [decoded, setDecoded] = useState<string | null>(cached ?? null);
 
@@ -24,7 +24,7 @@ export function Thumb({ z, token, width = 400 }: { z: Zumen; token: string; widt
       const canvas = isPdf(z)
         ? await pdfPageToCanvas(fileUrl(z, token), 1, width)
         : await tiffToCanvas(fileUrl(z, token));
-      const data = canvas.toDataURL("image/jpeg", 0.8);
+      const data = canvas.toDataURL("image/png"); // PNG: keeps alpha, never blackens transparency
       cache.set(z.id, data);
       if (!dead) setDecoded(data);
     })().catch(() => {}); // leaves the fallback icon showing
@@ -37,9 +37,7 @@ export function Thumb({ z, token, width = 400 }: { z: Zumen; token: string; widt
     ? null
     : native
       ? fileUrl(z, token, `${width}x${Math.round(width * 0.75)}`)
-      : z.thumb
-        ? thumbUrl(z, token)
-        : (cached ?? decoded);
+      : (cached ?? decoded);
 
   if (!src) {
     const Glyph = isPdf(z) ? FileText : ImageIcon;

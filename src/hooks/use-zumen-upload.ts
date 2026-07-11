@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { pb, baseName, MAX_FILE_BYTES, ACCEPTED_MIME } from "../lib/pb";
-import { makeThumb } from "../lib/preview";
 
 // The one shared upload procedure. oyaId undefined => new top-level blueprint
 // (Sidebar, Home); oyaId set => attach as a part (ko) of that blueprint (AttachPart).
@@ -32,8 +31,6 @@ export function useZumenUpload(oyaId: string | undefined, onDone: () => void) {
         const fd = new FormData();
         fd.set("name", baseName(f.name));
         fd.set("file", f);
-        const thumb = await makeThumb(f).catch(() => null); // pdf/tiff only; best-effort
-        if (thumb) fd.set("thumb", new File([thumb], "thumb.jpg", { type: "image/jpeg" }));
         if (oyaId) fd.set("oya", oyaId);
         fd.set("uploaded_by", pb.authStore.record!.id);
         await toast

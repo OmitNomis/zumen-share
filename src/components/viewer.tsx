@@ -61,6 +61,7 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
   const [penWidth, setPenWidth] = useState(3);
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(1);
+  const [pageLoading, setPageLoading] = useState(false); // decoding the active page onto the base canvas
   const [busy, setBusy] = useState("");
   const [copiesOpen, setCopiesOpen] = useState(false); // right drawer on small screens
   const [editingName, setEditingName] = useState(false);
@@ -100,6 +101,7 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
   useEffect(() => {
     if (!active) return;
     let dead = false;
+    setPageLoading(true);
     (async () => {
       const base = baseRef.current!;
       if (isPdf(active)) {
@@ -145,7 +147,9 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
       draw.height = base.height;
       setStrokes([]);
       current.current = null;
-    })().catch((e) => !dead && toast.error(String(e)));
+    })()
+      .catch((e) => !dead && toast.error(String(e)))
+      .finally(() => !dead && setPageLoading(false));
     return () => {
       dead = true;
     };
@@ -467,6 +471,11 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
               onPointerUp={up}
               onPointerCancel={up}
             />
+            {pageLoading && (
+              <div className="absolute inset-0 grid place-items-center bg-white/70">
+                <Spinner />
+              </div>
+            )}
           </div>
 
           {/* instrument tray */}

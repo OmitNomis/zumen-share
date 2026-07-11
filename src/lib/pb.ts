@@ -65,6 +65,3 @@ export const isOya = (z: Zumen) => !z.oya && !z.source; // top-level blueprint
 export function fileUrl(z: Zumen, token: string, thumb?: string) {
   return pb.files.getURL(z, z.file, thumb ? { token, thumb } : { token });
 }
-
-// URL for the stored preview image (only present on pdf/tiff uploads; check z.thumb first)
-export const thumbUrl = (z: Zumen, token: string) => pb.files.getURL(z, z.thumb, { token });
