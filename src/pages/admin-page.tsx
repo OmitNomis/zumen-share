@@ -76,7 +76,7 @@ export function AdminPage() {
           className="grid gap-3 rounded-t-lg border border-b-0 border-paper-300 bg-white px-5 py-4 sm:grid-cols-2"
         >
           <Field label="Email" name="email" type="email" required placeholder="new@office.jp" />
-          <Field label="Name" name="name" type="text" placeholder="Tanaka" />
+          <Field label="Name" name="name" type="text" required placeholder="Tanaka" />
           <Field label="Password" name="password" type="password" required minLength={8} placeholder="min 8 characters" />
           <SelectField label="Role" name="role" defaultValue="user">
             <option value="user">User</option>

@@ -15,7 +15,7 @@ const DAY = 86_400_000;
 const DATE_WINDOWS: Record<string, number> = { "7d": 7 * DAY, "30d": 30 * DAY };
 
 // names only resolve for accounts the viewer may see (admins: everyone; a user: themselves)
-const uploaderName = (o: Zumen) => o.expand?.uploaded_by?.name || o.expand?.uploaded_by?.email || "";
+const uploaderName = (o: Zumen) => o.expand?.uploaded_by?.name || "";
 
 const selectCls =
   "rounded-md border border-paper-300 bg-white px-2.5 py-2 text-sm text-ink-700 transition focus:border-print-500";

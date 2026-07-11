@@ -4,6 +4,7 @@ import { pb, isAdmin, type Zumen } from "../lib/pb";
 import { useZumenUpload } from "../hooks/use-zumen-upload";
 import { BTN, IconButton, Spinner } from "../ui";
 import { Logo } from "./logo";
+import { ProfileDialog } from "./profile-dialog";
 import { List, LogOut, Upload, Users, X } from "lucide-react";
 
 export type OyaNode = { oya: Zumen; ko: Zumen[] };
@@ -20,6 +21,11 @@ export function Sidebar({ open, onClose, onReload }: Props) {
   const taps = useRef(0);
   const { upload, busy } = useZumenUpload(undefined, onReload);
 
+  const me = pb.authStore.record;
+  const mustName = !me?.name; // name is mandatory — force the editor open until one is set
+  const [profileOpen, setProfileOpen] = useState(mustName);
+  const avatarUrl = me?.avatar ? pb.files.getURL(me, me.avatar) : "";
+
   function logoTap() {
     taps.current++;
     if (taps.current % 5 === 0) {
@@ -30,7 +36,6 @@ export function Sidebar({ open, onClose, onReload }: Props) {
     onClose();
   }
 
-  const me = pb.authStore.record;
   const footBtn =
     "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-ink-300 transition hover:bg-white/5 hover:text-white";
 
@@ -87,21 +92,26 @@ export function Sidebar({ open, onClose, onReload }: Props) {
         <Link to="/logs" onClick={onClose} className={footBtn}>
           <List className="h-4 w-4" /> Audit log
         </Link>
-        <div className="mt-1 flex items-center gap-2.5 rounded-md border border-ink-800 bg-ink-900/60 p-2">
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-ink-700 font-mono text-xs font-semibold uppercase text-white ring-1 ring-ink-600">
-            {(me?.name || me?.email)?.[0] ?? "?"}
-          </div>
-          <div className="min-w-0 flex-1" title={me?.email}>
-            <div className="truncate text-sm text-white">{me?.name || me?.email}</div>
-            <div className="truncate font-mono text-[10px] text-ink-400">
-              {me?.name ? me?.email : isAdmin() ? "admin" : "user"}
+        <div className="mt-1 flex items-center gap-1 rounded-md border border-ink-800 bg-ink-900/60 p-1.5">
+          <button
+            onClick={() => setProfileOpen(true)}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded px-1 py-1 text-left transition hover:bg-white/5"
+          >
+            <div className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-ink-700 font-mono text-xs font-semibold uppercase text-white ring-1 ring-ink-600">
+              {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : (me?.name?.[0] ?? "?")}
             </div>
-          </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm text-white">{me?.name || "Set your name"}</div>
+              <div className="truncate font-mono text-[10px] text-ink-400">{isAdmin() ? "admin" : "user"}</div>
+            </div>
+          </button>
           <IconButton dark label="Log out" onClick={() => pb.authStore.clear()} className="h-9 w-9">
             <LogOut className="h-4 w-4" />
           </IconButton>
         </div>
       </div>
+
+      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} forced={mustName} />
     </aside>
   );
 }
