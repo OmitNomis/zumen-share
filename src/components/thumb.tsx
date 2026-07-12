@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fileUrl, isPdf, isNativeImage, type Zumen } from "../lib/pb";
+import { pb, fileUrl, isPdf, isNativeImage, type Zumen } from "../lib/pb";
 import { pdfPageToCanvas, tiffToCanvas } from "../lib/preview";
 import { FileText, Image as ImageIcon } from "lucide-react";
 
@@ -13,7 +13,9 @@ const cache = new Map<string, string>();
 // transparent-pixel-turns-black surprises), cached above.
 export function Thumb({ z, token, width = 400 }: { z: Zumen; token: string; width?: number }) {
   const native = isNativeImage(z);
-  const needsDecode = !native;
+  // pdf/tiff with a stored preview → serve it; only decode the full file for legacy records
+  // uploaded before thumbs were generated (see makeThumbBlob).
+  const needsDecode = !native && !z.thumb;
   const cached = needsDecode ? cache.get(z.id) : undefined;
   const [decoded, setDecoded] = useState<string | null>(cached ?? null);
 
@@ -37,7 +39,9 @@ export function Thumb({ z, token, width = 400 }: { z: Zumen; token: string; widt
     ? null
     : native
       ? fileUrl(z, token, `${width}x${Math.round(width * 0.75)}`)
-      : (cached ?? decoded);
+      : z.thumb
+        ? pb.files.getURL(z, z.thumb, { token })
+        : (cached ?? decoded);
 
   if (!src) {
     const Glyph = isPdf(z) ? FileText : ImageIcon;

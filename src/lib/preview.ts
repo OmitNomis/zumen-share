@@ -32,6 +32,32 @@ export async function tiffToCanvas(url: string): Promise<HTMLCanvasElement> {
   return c;
 }
 
+// A small white-flattened JPEG preview for a pdf/tiff upload, stored in the `thumb` field so
+// grids/panels serve a few-KB image instead of downloading + decoding the full file on every
+// render, in every browser. Native images use PocketBase's server thumbnails → returns null.
+export async function makeThumbBlob(file: File): Promise<Blob | null> {
+  const n = file.name.toLowerCase();
+  const pdf = n.endsWith(".pdf");
+  const tiff = /\.tiff?$/.test(n);
+  if (!pdf && !tiff) return null;
+  const url = URL.createObjectURL(file);
+  try {
+    const raw = pdf ? await pdfPageToCanvas(url, 1, 400) : await tiffToCanvas(url);
+    // downscale to <=400px wide; flatten onto white (jpeg has no alpha → transparency blackens)
+    const scale = Math.min(1, 400 / raw.width);
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(raw.width * scale));
+    c.height = Math.max(1, Math.round(raw.height * scale));
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(raw, 0, 0, c.width, c.height);
+    return await new Promise((res) => c.toBlob((b) => res(b), "image/jpeg", 0.7));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 // Render one PDF page onto a fresh canvas at ~targetWidth CSS px (clamped for crispness).
 export async function pdfPageToCanvas(url: string, pageNum: number, targetWidth: number): Promise<HTMLCanvasElement> {
   const pdf = await pdfjs.getDocument({ url }).promise;
