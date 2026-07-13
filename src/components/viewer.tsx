@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { toast } from "sonner";
+import { Toolbar } from "radix-ui";
 import * as pdfjs from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { pb, fileUrl, isPdf, isTiff, type Zumen } from "../lib/pb";
 import { tiffToCanvas } from "../lib/preview"; // also configures the pdf.js worker
 import { Thumb } from "./thumb";
 import { SwipeToDelete } from "./swipe-to-delete";
+import { Tip } from "./ui/tooltip";
 import { useConfirm } from "../hooks/use-confirm";
 import { useZumenUpload } from "../hooks/use-zumen-upload";
 import { useEscapeKey } from "../hooks/use-escape-key";
@@ -61,6 +63,7 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
   const [penWidth, setPenWidth] = useState(3);
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(1);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null); // active sheet pixel size, for the HUD
   const [pageLoading, setPageLoading] = useState(false); // decoding the active page onto the base canvas
   const [busy, setBusy] = useState("");
   const [copiesOpen, setCopiesOpen] = useState(false); // right drawer on small screens
@@ -145,6 +148,7 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
       const draw = drawRef.current!;
       draw.width = base.width;
       draw.height = base.height;
+      setDims({ w: base.width, h: base.height });
       setStrokes([]);
       current.current = null;
     })()
@@ -366,24 +370,30 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
 
   if (!subject || !root)
     return (
-      <div className="grid-dark grid h-full place-items-center">
-        <div className="flex items-center gap-3 text-ink-300">
+      <div className="workspace grid h-full place-items-center">
+        <div className="flex items-center gap-3 font-mono text-xs uppercase tracking-widest text-ink-300">
           <Spinner /> Loading sheet…
         </div>
       </div>
     );
 
   const viewingCopy = activeId !== subject.id;
-  const seg = (on: boolean) =>
-    `grid h-9 w-10 place-items-center rounded-md transition ${
-      on ? "bg-print-600 text-white shadow-sm shadow-print-900/40" : "text-ink-500 hover:text-ink-800"
+  // segmented pan/pen toggle inside the dark instrument tray. Pen glows viridian when
+  // engaged — the one "live" accent — while pan stays cyanotype blue.
+  const seg = (on: boolean, live = false) =>
+    `grid h-9 w-10 place-items-center rounded-md transition-all active:scale-[0.96] ${
+      on
+        ? live
+          ? "bg-virid-500 text-char-950 shadow-sm shadow-virid-600/40"
+          : "bg-print-600 text-white shadow-sm shadow-print-800/50"
+        : "text-ink-300 hover:text-white"
     }`;
   const tbtn =
-    "grid h-10 w-10 shrink-0 place-items-center rounded-md text-ink-500 transition hover:bg-paper-200/70 hover:text-ink-800 disabled:opacity-40";
+    "grid h-10 w-10 shrink-0 place-items-center rounded-md text-ink-300 transition-all hover:bg-white/10 hover:text-white active:scale-[0.96] disabled:opacity-30 disabled:hover:bg-transparent";
 
   return (
     <div className="flex h-full">
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         {/* title bar */}
         <header className="flex h-14 shrink-0 items-center gap-1.5 border-b border-paper-300 bg-paper-50 px-2 sm:gap-2 sm:px-4">
           <IconButton label="Menu" onClick={onMenu} className="lg:hidden">
@@ -455,10 +465,10 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
           </div>
         </header>
 
-        {/* light table */}
-        <main className="grid-dark relative flex-1 overflow-auto p-4 pb-28 sm:p-6">
+        {/* the stage — a charcoal table the sheet floats on, lit from above */}
+        <main className="workspace flex-1 overflow-auto p-6 pb-28 sm:p-10">
           <div
-            className="relative mx-auto bg-white shadow-2xl shadow-black/60 ring-1 ring-white/10"
+            className="crop-marks relative mx-auto bg-white text-white/30 shadow-2xl shadow-black/70 ring-1 ring-white/10"
             style={{ width: `${zoom * 100}%`, maxWidth: 1600 * zoom }}
           >
             <canvas ref={baseRef} className="block h-auto w-full" />
@@ -477,109 +487,154 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
               </div>
             )}
           </div>
+        </main>
 
-          {/* instrument tray */}
-          <div className="fixed bottom-4 left-1/2 z-20 max-w-[94vw] -translate-x-1/2 sm:bottom-6">
-            <div className="flex items-center gap-1.5 overflow-x-auto rounded-xl bg-paper-50/95 px-2 py-1.5 shadow-2xl shadow-black/50 ring-1 ring-ink-900/15 backdrop-blur sm:gap-2 sm:px-3 sm:py-2">
-              <div className="flex shrink-0 items-center rounded-lg bg-paper-200/80 p-0.5">
-                <button onClick={() => setMode("pan")} className={seg(mode === "pan")} title="Pan / zoom">
+        {/* viewport HUD — pinned to the stage, technical readout of the active sheet */}
+        <div className="pointer-events-none absolute left-4 top-[4.25rem] z-20 flex flex-wrap items-center gap-1.5 sm:left-6">
+          <span
+            className={`flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest ring-1 backdrop-blur ${
+              mode === "pen"
+                ? "bg-virid-500/10 text-virid-300 ring-virid-500/30"
+                : "bg-char-900/70 text-ink-200 ring-white/10"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${mode === "pen" ? "animate-live bg-virid-400" : "bg-ink-400"}`}
+            />
+            {mode === "pen" ? "Marking" : "View"}
+          </span>
+          <span className="rounded-md bg-char-900/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-300 ring-1 ring-white/10 backdrop-blur">
+            {dims ? `${dims.w}×${dims.h}` : "—"}
+          </span>
+          <span className="rounded-md bg-char-900/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-300 ring-1 ring-white/10 backdrop-blur">
+            {active && isPdf(active) ? "PDF" : active && isTiff(active) ? "TIFF" : "IMG"}
+            {numPages > 1 ? ` · p${page}/${numPages}` : ""}
+          </span>
+        </div>
+
+        {/* instrument tray — Radix Toolbar, dark glass, docked bottom-centre */}
+        <div className="fixed bottom-4 left-1/2 z-20 max-w-[94vw] -translate-x-1/2 sm:bottom-6">
+          <Toolbar.Root className="flex items-center gap-1.5 overflow-x-auto rounded-2xl bg-char-800/85 px-2 py-1.5 shadow-2xl shadow-black/60 ring-1 ring-white/10 backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2">
+            <Toolbar.ToggleGroup
+              type="single"
+              value={mode}
+              onValueChange={(v) => v && setMode(v as "pan" | "pen")}
+              className="flex shrink-0 items-center rounded-lg bg-char-950/70 p-0.5 ring-1 ring-white/5"
+            >
+              <Tip label="Pan / zoom">
+                <Toolbar.ToggleItem value="pan" aria-label="Pan / zoom" className={seg(mode === "pan")}>
                   <Move className="h-5 w-5" />
-                </button>
-                <button onClick={() => setMode("pen")} className={seg(mode === "pen")} title="Draw">
+                </Toolbar.ToggleItem>
+              </Tip>
+              <Tip label="Draw">
+                <Toolbar.ToggleItem value="pen" aria-label="Draw" className={seg(mode === "pen", true)}>
                   <Pen className="h-5 w-5" />
-                </button>
-              </div>
+                </Toolbar.ToggleItem>
+              </Tip>
+            </Toolbar.ToggleGroup>
 
-              <div className="h-6 w-px shrink-0 bg-paper-300" />
-              <button onClick={() => zoomBy(0.8)} className={tbtn} title="Zoom out">
+            <Toolbar.Separator className="h-6 w-px shrink-0 bg-white/10" />
+            <Tip label="Zoom out">
+              <Toolbar.Button onClick={() => zoomBy(0.8)} className={tbtn}>
                 <ZoomOut className="h-5 w-5" />
-              </button>
-              <button
+              </Toolbar.Button>
+            </Tip>
+            <Tip label="Reset zoom">
+              <Toolbar.Button
                 onClick={() => setZoom(1)}
-                className="w-11 shrink-0 text-center font-mono text-[11px] tabular-nums text-ink-500 transition hover:text-ink-800"
-                title="Reset zoom"
+                className="w-12 shrink-0 rounded-md py-2 text-center font-mono text-[11px] tabular-nums text-ink-200 transition hover:bg-white/10 hover:text-white"
               >
                 {Math.round(zoom * 100)}%
-              </button>
-              <button onClick={() => zoomBy(1.25)} className={tbtn} title="Zoom in">
+              </Toolbar.Button>
+            </Tip>
+            <Tip label="Zoom in">
+              <Toolbar.Button onClick={() => zoomBy(1.25)} className={tbtn}>
                 <ZoomIn className="h-5 w-5" />
-              </button>
+              </Toolbar.Button>
+            </Tip>
 
-              {mode === "pen" && (
-                <>
-                  <div className="h-6 w-px shrink-0 bg-paper-300" />
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {PRESETS.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => setColor(c)}
-                        style={{ background: c }}
-                        title="Pen color"
-                        className={`h-7 w-7 rounded-full transition ${
-                          color === c ? "ring-2 ring-print-500 ring-offset-2 ring-offset-paper-50" : "hover:scale-110"
-                        }`}
-                      />
-                    ))}
-                    <label
-                      className="relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full ring-1 ring-paper-300"
-                      title="Custom color"
-                    >
-                      <Pen className="h-3.5 w-3.5 text-ink-400" />
-                      <input
-                        type="color"
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="absolute inset-0 cursor-pointer opacity-0"
-                      />
-                    </label>
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={20}
-                    value={penWidth}
-                    onChange={(e) => setPenWidth(+e.target.value)}
-                    className="w-20 shrink-0 accent-print-600"
-                    title={`Pen width ${penWidth}px`}
-                  />
-                  <button onClick={() => setStrokes((s) => s.slice(0, -1))} className={tbtn} title="Undo">
-                    <Undo2 className="h-5 w-5" />
-                  </button>
-                  <button onClick={() => setStrokes([])} className={tbtn} title="Clear marks">
-                    <Eraser className="h-5 w-5" />
-                  </button>
-                </>
-              )}
-
-              {numPages > 1 && (
-                <>
-                  <div className="h-6 w-px shrink-0 bg-paper-300" />
-                  <div className="flex shrink-0 items-center gap-1">
+            {mode === "pen" && (
+              <>
+                <Toolbar.Separator className="h-6 w-px shrink-0 bg-white/10" />
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {PRESETS.map((c) => (
                     <button
+                      key={c}
+                      onClick={() => setColor(c)}
+                      style={{ background: c }}
+                      aria-label={`Pen colour ${c}`}
+                      className={`h-7 w-7 rounded-full transition-all ${
+                        color === c
+                          ? "ring-2 ring-white ring-offset-2 ring-offset-char-800"
+                          : "ring-1 ring-white/15 hover:scale-110"
+                      }`}
+                    />
+                  ))}
+                  <label
+                    className="relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full ring-1 ring-white/20"
+                    title="Custom colour"
+                  >
+                    <Pen className="h-3.5 w-3.5 text-ink-200" />
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                    />
+                  </label>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={20}
+                  value={penWidth}
+                  onChange={(e) => setPenWidth(+e.target.value)}
+                  className="w-20 shrink-0 accent-virid-500"
+                  title={`Pen width ${penWidth}px`}
+                />
+                <Tip label="Undo">
+                  <Toolbar.Button onClick={() => setStrokes((s) => s.slice(0, -1))} className={tbtn}>
+                    <Undo2 className="h-5 w-5" />
+                  </Toolbar.Button>
+                </Tip>
+                <Tip label="Clear marks">
+                  <Toolbar.Button onClick={() => setStrokes([])} className={tbtn}>
+                    <Eraser className="h-5 w-5" />
+                  </Toolbar.Button>
+                </Tip>
+              </>
+            )}
+
+            {numPages > 1 && (
+              <>
+                <Toolbar.Separator className="h-6 w-px shrink-0 bg-white/10" />
+                <div className="flex shrink-0 items-center gap-1">
+                  <Tip label="Previous page">
+                    <Toolbar.Button
                       onClick={async () => (await confirmDiscard()) && setPage((p) => Math.max(1, p - 1))}
                       className={tbtn}
                       disabled={page <= 1}
-                      title="Previous page"
                     >
                       <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <span className="w-10 text-center font-mono text-xs tabular-nums text-ink-600">
-                      {page}/{numPages}
-                    </span>
-                    <button
+                    </Toolbar.Button>
+                  </Tip>
+                  <span className="w-10 text-center font-mono text-xs tabular-nums text-ink-200">
+                    {page}/{numPages}
+                  </span>
+                  <Tip label="Next page">
+                    <Toolbar.Button
                       onClick={async () => (await confirmDiscard()) && setPage((p) => Math.min(numPages, p + 1))}
                       className={tbtn}
                       disabled={page >= numPages}
-                      title="Next page"
                     >
                       <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </main>
+                    </Toolbar.Button>
+                  </Tip>
+                </div>
+              </>
+            )}
+          </Toolbar.Root>
+        </div>
       </div>
 
       {/* right panel: copies of the current drawing — drawer below xl, static on xl */}

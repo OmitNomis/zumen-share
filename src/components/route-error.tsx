@@ -13,7 +13,7 @@ export function RouteError() {
       : "Something went wrong.";
 
   return (
-    <div className="grid-dark grid h-full min-h-[100dvh] place-items-center p-4">
+    <div className="workspace grid h-full min-h-[100dvh] place-items-center p-4">
       <div className="w-full max-w-sm rounded-lg bg-paper-50 p-8 text-center shadow-2xl shadow-black/50">
         <p className="text-lg font-bold text-ink-900">Something broke.</p>
         <p className="mt-2 break-words text-sm text-ink-500">{message}</p>

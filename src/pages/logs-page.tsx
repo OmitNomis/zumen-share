@@ -24,7 +24,7 @@ export function LogsPage() {
   }, []);
 
   return (
-    <div className="grid-paper h-full overflow-auto">
+    <div className="field-paper h-full overflow-auto">
       <PageHeader title="Audit log" kanji="記" sub="every action, on the record" onMenu={onMenu} />
       <div className="overflow-auto p-4 sm:p-8">
         <table className="w-full rounded-lg border border-paper-300 bg-white text-sm shadow-sm">

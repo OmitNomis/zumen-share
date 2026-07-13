@@ -29,7 +29,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="grid-dark grid min-h-screen place-items-center p-4">
+    <div className="workspace grid min-h-screen place-items-center p-4">
       <div className="w-full max-w-sm">
         <motion.form
           onSubmit={submit}

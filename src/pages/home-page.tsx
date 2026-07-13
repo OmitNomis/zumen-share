@@ -3,6 +3,7 @@ import { Link, useOutletContext } from "react-router-dom";
 import { toast } from "sonner";
 import { Thumb } from "../components/thumb";
 import { ZumenMenu } from "../components/zumen-menu";
+import { DropOverlay } from "../components/drop-overlay";
 import { BTN, IconButton, Spinner, Stamp, microCls } from "../ui";
 import { useZumenUpload } from "../hooks/use-zumen-upload";
 import { useZumenPage } from "../hooks/use-zumen-page";
@@ -122,14 +123,8 @@ export function HomePage() {
   }, [loadMore]);
 
   return (
-    <div ref={scrollRef} className="relative grid-paper h-full overflow-auto" {...dropProps}>
-      {isOver && (
-        <div className="pointer-events-none fixed inset-0 z-20 grid place-items-center border-4 border-dashed border-print-500 bg-print-500/10 backdrop-blur-[1px]">
-          <div className="flex items-center gap-2.5 rounded-lg bg-white px-6 py-4 text-lg font-semibold text-print-700 shadow-2xl">
-            <Upload className="h-5 w-5" /> Drop to upload
-          </div>
-        </div>
-      )}
+    <div ref={scrollRef} className="field-paper relative h-full overflow-auto" {...dropProps}>
+      <DropOverlay show={isOver} />
       <header className="sticky top-0 z-10 border-b border-paper-300/70 bg-paper-100/85 px-4 py-4 backdrop-blur sm:px-8">
         <div className="flex items-center gap-3">
           <IconButton label="Menu" onClick={onMenu} className="-ml-2 lg:hidden">
@@ -200,11 +195,25 @@ export function HomePage() {
           </div>
         ) : (
           <div className="grid place-items-center px-4 py-24">
-            <div className="w-full max-w-md rounded-lg border-2 border-dashed border-print-200 bg-white/60 px-8 py-14 text-center">
-              <div className="mb-4 animate-bounce text-6xl">😺</div>
-              <p className="font-semibold text-ink-800">No blueprints yet</p>
-              <p className="mt-1 text-sm text-ink-500">Drag a file here, or upload from the sidebar.</p>
-            </div>
+            <label className="crop-marks group relative flex w-full max-w-md cursor-pointer flex-col items-center gap-4 rounded-xl border border-print-200 bg-white/70 px-10 py-16 text-center text-print-400 transition-all hover:border-print-400 hover:bg-white active:scale-[0.99]">
+              <span className="grid h-16 w-16 place-items-center rounded-2xl bg-print-50 text-print-500 ring-1 ring-print-200 transition group-hover:bg-print-600 group-hover:text-white group-hover:ring-print-600">
+                <Upload className="h-7 w-7" />
+              </span>
+              <div>
+                <p className="text-base font-bold text-ink-900">No blueprints yet</p>
+                <p className="mt-1 text-sm text-ink-500">Drop a file here, or click to browse.</p>
+              </div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-print-400">
+                図面 · pdf / png / jpg / tiff
+              </p>
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf"
+                className="hidden"
+                onChange={(e) => upload(e.target.files)}
+              />
+            </label>
           </div>
         )
       ) : (

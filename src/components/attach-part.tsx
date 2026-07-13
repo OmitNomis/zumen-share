@@ -6,6 +6,7 @@ import { useFileDrop } from "../hooks/use-file-drop";
 import { useEscapeKey } from "../hooks/use-escape-key";
 import { Button, IconButton, Spinner, microCls } from "../ui";
 import { Input } from "./ui/input";
+import { DropOverlay } from "./drop-overlay";
 import { ArrowLeft, Check, Plus, Search, Upload } from "lucide-react";
 import type { AttachContext } from "./viewer";
 
@@ -76,14 +77,8 @@ export function AttachPart() {
   const { isOver, dropProps } = useFileDrop(upload);
 
   return (
-    <div className="animate-fade grid-paper fixed inset-0 z-50 flex flex-col bg-paper-100" {...dropProps}>
-      {isOver && (
-        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center border-4 border-dashed border-print-500 bg-print-500/10 backdrop-blur-[1px]">
-          <div className="flex items-center gap-2.5 rounded-lg bg-white px-6 py-4 text-lg font-semibold text-print-700 shadow-2xl">
-            <Upload className="h-5 w-5" /> Drop to upload
-          </div>
-        </div>
-      )}
+    <div className="animate-fade field-paper fixed inset-0 z-50 flex flex-col bg-paper-100" {...dropProps}>
+      <DropOverlay show={isOver} />
 
       <header className="flex shrink-0 items-center gap-3 border-b border-paper-300/70 bg-paper-100/85 px-4 py-4 backdrop-blur sm:px-8">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-print-200 bg-print-50 text-base font-semibold text-print-700 select-none">

@@ -68,7 +68,7 @@ export function AdminPage() {
   }
 
   return (
-    <div className="grid-paper h-full overflow-auto">
+    <div className="field-paper h-full overflow-auto">
       <PageHeader title="Accounts" kanji="名" sub="office roster" onMenu={onMenu} />
       <div className="p-4 sm:p-8">
         <form
