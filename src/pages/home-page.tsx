@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { toast } from "sonner";
 import { Thumb } from "../components/thumb";
+import { ZumenMenu } from "../components/zumen-menu";
 import { BTN, IconButton, Spinner, Stamp, microCls } from "../ui";
 import { useZumenUpload } from "../hooks/use-zumen-upload";
 import { useZumenPage } from "../hooks/use-zumen-page";
@@ -255,14 +256,18 @@ export function HomePage() {
                   {inner}
                 </button>
               );
+            // menu sits as a sibling of the Link (not nested in the <a>) so its clicks don't
+            // navigate; group-hover keeps the card lifted while the pointer is on the menu
             return (
-              <Link
-                key={oya.id}
-                to={`/z/${oya.id}`}
-                className={`${base} border-paper-300 hover:-translate-y-1 hover:border-print-400 hover:shadow-xl hover:shadow-print-900/10`}
-              >
-                {inner}
-              </Link>
+              <div key={oya.id} className="group relative">
+                <Link
+                  to={`/z/${oya.id}`}
+                  className={`${base} h-full border-paper-300 group-hover:-translate-y-1 group-hover:border-print-400 group-hover:shadow-xl group-hover:shadow-print-900/10`}
+                >
+                  {inner}
+                </Link>
+                <ZumenMenu z={oya} token={token} confirm={confirm} onDeleted={reload} />
+              </div>
             );
           })}
         </main>
