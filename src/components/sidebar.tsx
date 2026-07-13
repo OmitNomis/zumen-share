@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { pb, isAdmin, type Zumen } from "../lib/pb";
 import { useZumenUpload } from "../hooks/use-zumen-upload";
+import { useConfirm } from "../hooks/use-confirm";
 import { BTN, IconButton, Spinner } from "../ui";
 import { Logo } from "./logo";
 import { ProfileDialog } from "./profile-dialog";
@@ -20,6 +21,11 @@ export function Sidebar({ open, onClose, onReload }: Props) {
   const [meow, setMeow] = useState(false);
   const taps = useRef(0);
   const { upload, busy } = useZumenUpload(undefined, onReload);
+  const { confirm, dialog } = useConfirm();
+
+  async function logout() {
+    if (await confirm("Log out of Zumen Share?")) pb.authStore.clear();
+  }
 
   const me = pb.authStore.record;
   const mustName = !me?.name; // name is mandatory — force the editor open until one is set
@@ -105,13 +111,14 @@ export function Sidebar({ open, onClose, onReload }: Props) {
               <div className="truncate font-mono text-[10px] text-ink-400">{isAdmin() ? "admin" : "user"}</div>
             </div>
           </button>
-          <IconButton dark label="Log out" onClick={() => pb.authStore.clear()} className="h-9 w-9">
+          <IconButton dark label="Log out" onClick={logout} className="h-9 w-9">
             <LogOut className="h-4 w-4" />
           </IconButton>
         </div>
       </div>
 
       <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} forced={mustName} />
+      {dialog}
     </aside>
   );
 }
