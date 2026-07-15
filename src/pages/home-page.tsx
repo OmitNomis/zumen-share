@@ -125,7 +125,7 @@ export function HomePage() {
   return (
     <div ref={scrollRef} className="field-paper relative h-full overflow-auto" {...dropProps}>
       <DropOverlay show={isOver} />
-      <header className="sticky top-0 z-10 border-b border-paper-300/70 bg-paper-100/85 px-4 py-4 backdrop-blur sm:px-8">
+      <header className="sticky top-0 z-100 border-b border-paper-300/70 bg-paper-100/85 px-4 py-4 backdrop-blur sm:px-8">
         <div className="flex items-center gap-3">
           <IconButton label="Menu" onClick={onMenu} className="-ml-2 lg:hidden">
             <Menu className="h-5 w-5" />
