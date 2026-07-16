@@ -35,6 +35,9 @@ from `pb_public`.
   through Windows Firewall the first time)
 - Admin UI: http://localhost:8090/_/ (superuser account)
 
+For standing this up as an always-on office server (Windows service, HTTPS,
+backups, updates), see [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Accounts
 
 Self-signup is disabled. Create app accounts as superuser in the Admin UI →
