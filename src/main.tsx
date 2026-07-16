@@ -5,6 +5,9 @@ import './index.css'
 import { router } from './router'
 import { Toaster } from 'sonner'
 import { TooltipProvider } from './components/ui/tooltip'
+import { registerPWA } from './pwa'
+
+registerPWA()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

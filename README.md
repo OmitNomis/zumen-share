@@ -61,6 +61,30 @@ npm run build  # outputs to pb_public, served by pocketbase
 Schema changes go in `pb_migrations/` (applied automatically at startup, or
 `./pocketbase.exe migrate up`).
 
+## Install as an app (PWA)
+
+The build ships a web-app manifest and a service worker (via `vite-plugin-pwa`),
+so Zumen Share can be installed to a desktop/home screen and launches in its own
+standalone window. The service worker precaches the app shell (HTML/JS/CSS +
+icons + the PDF worker), so the shell loads instantly and survives brief network
+drops. A new deploy shows a "Reload" toast rather than swapping assets mid-markup.
+
+The API (`/api`) and admin UI (`/_/`) are never cached — records are live and
+files use rotating auth tokens.
+
+> **Requires a secure context.** Browsers only register service workers over
+> **HTTPS** or on **`localhost`**. Coworkers reaching the app at
+> `http://<your-ip>:8090` get the site but **not** installability/offline until
+> it's served over HTTPS (e.g. a reverse proxy with a cert, Cloudflare Tunnel, or
+> Tailscale). Everything degrades gracefully — plain HTTP just skips the SW.
+
+App icons are generated from the in-app brand mark; re-run after changing it
+(needs Chrome or Edge — no native image deps):
+
+```powershell
+node scripts/generate-pwa-icons.mjs
+```
+
 ## Smoke test
 
 ```powershell
