@@ -45,7 +45,7 @@ export function CatEasterEgg() {
 
   if (!cats) return null;
   return (
-    <div className="fixed inset-0 z-100 overflow-hidden">
+    <div className="fixed inset-0 z-110 overflow-hidden">
       {cats.map((c, n) => (
         <span
           key={n}
