@@ -53,6 +53,7 @@ type Props = {
 export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
   const [subject, setSubject] = useState<Zumen | null>(null); // the drawing being viewed (oya or ko)
   const [root, setRoot] = useState<Zumen | null>(null); // its oya (== subject when subject is an oya)
+  const [parts, setParts] = useState<Zumen[]>([]); // ko (real parts) of root — shown in the right panel
   const [copies, setCopies] = useState<Zumen[]>([]); // markup snapshots of subject
   const [token, setToken] = useState(""); // for right-panel thumbnails
   const [activeId, setActiveId] = useState(id); // subject.id, or a copy id when viewing a copy
@@ -87,6 +88,16 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
     return cs;
   }
 
+  // real parts (ko) of the blueprint: oya = root, and not a markup copy (source = '')
+  async function loadParts(rootId: string) {
+    const ks = await pb.collection("zumen").getFullList<Zumen>({
+      filter: pb.filter("oya = {:id} && source = ''", { id: rootId }),
+      sort: "created",
+    });
+    setParts(ks);
+    return ks;
+  }
+
   useEffect(() => {
     (async () => {
       const subj = await pb.collection("zumen").getOne<Zumen>(id);
@@ -96,7 +107,7 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
       setToken(await pb.files.getToken());
       setActiveId(subj.id);
       setPage(1);
-      await loadCopies(subj.id);
+      await Promise.all([loadCopies(subj.id), loadParts(rt.id)]);
     })().catch((e) => toast.error(String(e)));
   }, [id]);
 
@@ -314,6 +325,7 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
   async function addKo(files: FileList | null) {
     setBusy("Attaching…");
     await uploadKo(files);
+    if (root) await loadParts(root.id); // reflect the new parts in the panel without a remount
     setBusy("");
   }
 
@@ -323,12 +335,23 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
     setBusy("Attaching…");
     try {
       for (const oid of oyaIds) await pb.collection("zumen").update(oid, { oya: root.id });
+      await loadParts(root.id);
       onReload();
     } catch (e) {
       toast.error(`Attach failed: ${e}`);
     } finally {
       setBusy("");
     }
+  }
+
+  // open a part (ko) from the panel. Same sheet already open → return to its original view
+  // (from a copy); otherwise navigate, guarding any unsaved marks first.
+  async function openPart(pid: string) {
+    if (pid === subject?.id) {
+      if (viewingCopy) view(subject.id);
+      return;
+    }
+    if (await confirmDiscard()) onOpen(pid);
   }
 
   async function delSubject() {
@@ -378,6 +401,7 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
     );
 
   const viewingCopy = activeId !== subject.id;
+  const oyaActive = !viewingCopy && subject.id === root.id; // the parent blueprint is the active sheet
   // segmented pan/pen toggle inside the dark instrument tray. Pen glows viridian when
   // engaged — the one "live" accent — while pan stays cyanotype blue.
   const seg = (on: boolean, live = false) =>
@@ -465,51 +489,112 @@ export function Viewer({ id, onOpen, onHome, onReload, onMenu }: Props) {
           </div>
         </header>
 
-        {/* the stage — a charcoal table the sheet floats on, lit from above */}
-        <main className="workspace flex-1 overflow-auto p-6 pb-28 sm:p-10">
-          <div
-            className="crop-marks relative mx-auto bg-white text-white/30 shadow-2xl shadow-black/70 ring-1 ring-white/10"
-            style={{ width: `${zoom * 100}%`, maxWidth: 1600 * zoom }}
-          >
-            <canvas ref={baseRef} className="block h-auto w-full" />
-            <canvas
-              ref={drawRef}
-              className={`absolute inset-0 h-full w-full ${mode === "pen" ? "cursor-crosshair" : "pointer-events-none"}`}
-              style={{ touchAction: mode === "pen" ? "none" : "auto" }}
-              onPointerDown={down}
-              onPointerMove={move}
-              onPointerUp={up}
-              onPointerCancel={up}
-            />
-            {pageLoading && (
-              <div className="absolute inset-0 grid place-items-center bg-white/70">
-                <Spinner />
+        {/* parts (ko) filmstrip — the oya (親) preview is pinned at the very left so returning to
+            the parent blueprint is always one tap away, then its sub-drawings scroll to the right.
+            The active sheet is highlighted; hidden when the blueprint has no parts. */}
+        {parts.length > 0 && (
+          <div className="shrink-0 border-b border-paper-300 bg-paper-100/80">
+            <div className="flex items-stretch gap-2 overflow-x-auto px-2 py-2 sm:px-4">
+              {/* oya (parent) — sticky at the very left, masks the parts scrolling behind it */}
+              <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 bg-paper-100/80 pr-1">
+                <button
+                  onClick={() => openPart(root.id)}
+                  title={`Back to ${root.name}`}
+                  aria-current={oyaActive}
+                  className={`group relative w-24 shrink-0 overflow-hidden rounded-md border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                    oyaActive ? "border-print-500 ring-1 ring-print-500" : "border-paper-300 hover:border-print-400"
+                  }`}
+                >
+                  <div className="grid aspect-4/3 place-items-center overflow-hidden border-b border-paper-200 bg-paper-100">
+                    <Thumb z={root} token={token} width={200} />
+                  </div>
+                  <div className="flex items-center gap-1 px-1.5 py-1">
+                    <span className="grid h-4 w-4 shrink-0 place-items-center rounded-sm border border-print-200 bg-print-50 text-[9px] font-semibold text-print-700 select-none">
+                      親
+                    </span>
+                    <span className={`truncate text-[11px] ${oyaActive ? "font-semibold text-print-800" : "text-ink-700"}`}>
+                      {root.name}
+                    </span>
+                  </div>
+                </button>
+                <ChevronRight className="h-4 w-4 shrink-0 text-paper-400" />
               </div>
-            )}
+              {parts.map((p) => {
+                const on = !viewingCopy && p.id === subject.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => openPart(p.id)}
+                    title={p.name}
+                    aria-current={on}
+                    className={`group relative w-24 shrink-0 overflow-hidden rounded-md border bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                      on ? "border-print-500 ring-1 ring-print-500" : "border-paper-300 hover:border-print-400"
+                    }`}
+                  >
+                    <div className="grid aspect-4/3 place-items-center overflow-hidden border-b border-paper-200 bg-paper-100">
+                      <Thumb z={p} token={token} width={200} />
+                    </div>
+                    <div
+                      className={`truncate px-1.5 py-1 text-[11px] ${on ? "font-semibold text-print-800" : "text-ink-700"}`}
+                    >
+                      {p.name}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </main>
+        )}
 
-        {/* viewport HUD — pinned to the stage, technical readout of the active sheet */}
-        <div className="pointer-events-none absolute left-4 top-[4.25rem] z-20 flex flex-wrap items-center gap-1.5 sm:left-6">
-          <span
-            className={`flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest ring-1 backdrop-blur ${
-              mode === "pen"
-                ? "bg-virid-500/10 text-virid-300 ring-virid-500/30"
-                : "bg-char-900/70 text-ink-200 ring-white/10"
-            }`}
-          >
+        {/* stage + HUD in a relative box so the readout pins to the stage's own top-left and
+            never collides with the parts filmstrip above it */}
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {/* the stage — a charcoal table the sheet floats on, lit from above */}
+          <main className="workspace min-h-0 flex-1 overflow-auto p-6 pb-28 sm:p-10">
+            <div
+              className="crop-marks relative mx-auto bg-white text-white/30 shadow-2xl shadow-black/70 ring-1 ring-white/10"
+              style={{ width: `${zoom * 100}%`, maxWidth: 1600 * zoom }}
+            >
+              <canvas ref={baseRef} className="block h-auto w-full" />
+              <canvas
+                ref={drawRef}
+                className={`absolute inset-0 h-full w-full ${mode === "pen" ? "cursor-crosshair" : "pointer-events-none"}`}
+                style={{ touchAction: mode === "pen" ? "none" : "auto" }}
+                onPointerDown={down}
+                onPointerMove={move}
+                onPointerUp={up}
+                onPointerCancel={up}
+              />
+              {pageLoading && (
+                <div className="absolute inset-0 grid place-items-center bg-white/70">
+                  <Spinner />
+                </div>
+              )}
+            </div>
+          </main>
+
+          {/* viewport HUD — pinned to the stage top-left, technical readout of the active sheet */}
+          <div className="pointer-events-none absolute left-4 top-4 z-20 flex flex-wrap items-center gap-1.5 sm:left-6">
             <span
-              className={`h-1.5 w-1.5 rounded-full ${mode === "pen" ? "animate-live bg-virid-400" : "bg-ink-400"}`}
-            />
-            {mode === "pen" ? "Marking" : "View"}
-          </span>
-          <span className="rounded-md bg-char-900/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-300 ring-1 ring-white/10 backdrop-blur">
-            {dims ? `${dims.w}×${dims.h}` : "—"}
-          </span>
-          <span className="rounded-md bg-char-900/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-300 ring-1 ring-white/10 backdrop-blur">
-            {active && isPdf(active) ? "PDF" : active && isTiff(active) ? "TIFF" : "IMG"}
-            {numPages > 1 ? ` · p${page}/${numPages}` : ""}
-          </span>
+              className={`flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest ring-1 backdrop-blur ${
+                mode === "pen"
+                  ? "bg-virid-500/10 text-virid-300 ring-virid-500/30"
+                  : "bg-char-900/70 text-ink-200 ring-white/10"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${mode === "pen" ? "animate-live bg-virid-400" : "bg-ink-400"}`}
+              />
+              {mode === "pen" ? "Marking" : "View"}
+            </span>
+            <span className="rounded-md bg-char-900/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-300 ring-1 ring-white/10 backdrop-blur">
+              {dims ? `${dims.w}×${dims.h}` : "—"}
+            </span>
+            <span className="rounded-md bg-char-900/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-300 ring-1 ring-white/10 backdrop-blur">
+              {active && isPdf(active) ? "PDF" : active && isTiff(active) ? "TIFF" : "IMG"}
+              {numPages > 1 ? ` · p${page}/${numPages}` : ""}
+            </span>
+          </div>
         </div>
 
         {/* instrument tray — Radix Toolbar, dark glass, docked bottom-centre */}
