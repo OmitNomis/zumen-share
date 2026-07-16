@@ -18,6 +18,13 @@ edit / delete is audit-logged with the user who did it.
 Stack: PocketBase (auth, storage, API) + React/Vite/Tailwind frontend served
 from `pb_public`.
 
+## Screenshots
+
+|  |  |
+| :--: | :--: |
+| **Blueprint library** — search, filter, bulk select, drag-and-drop upload<br>[![Blueprint library](docs/screenshots/02-home.png)](docs/screenshots/02-home.png) | **Sign in** — internal accounts, installable as a PWA<br>[![Sign in](docs/screenshots/01-login.png)](docs/screenshots/01-login.png) |
+| **Viewer** — a blueprint (親) with its parts strung along the filmstrip<br>[![Viewer](docs/screenshots/03-viewer.png)](docs/screenshots/03-viewer.png) | **Markup** — pen tools with the viridian "live" accent; save as a copy<br>[![Markup](docs/screenshots/04-viewer-markup.png)](docs/screenshots/04-viewer-markup.png) |
+
 ## Run
 
 ```powershell
