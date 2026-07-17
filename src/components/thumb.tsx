@@ -47,5 +47,7 @@ export function Thumb({ z, token, width = 400 }: { z: Zumen; token: string; widt
     const Glyph = isPdf(z) ? FileText : ImageIcon;
     return <Glyph className="w-1/3 h-1/3 text-paper-400/70" />;
   }
-  return <img src={src} alt="" className="w-full h-full object-cover" />;
+  // draggable={false}: dragging a preview would otherwise start a native image drag, which the
+  // page's file-drop zones used to mistake for an incoming upload
+  return <img src={src} alt="" draggable={false} className="w-full h-full object-cover" />;
 }

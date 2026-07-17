@@ -271,6 +271,7 @@ export function HomePage() {
               <div key={oya.id} className="group relative">
                 <Link
                   to={`/z/${oya.id}`}
+                  draggable={false}
                   className={`${base} h-full border-paper-300 group-hover:-translate-y-1 group-hover:border-print-400 group-hover:shadow-xl group-hover:shadow-print-900/10`}
                 >
                   {inner}
